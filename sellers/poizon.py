@@ -7,8 +7,11 @@ from typing import Any
 import requests
 from pydantic import BaseModel
 
+import config
 from sellers.base import BaseSeller
 from models.product import ProductInfo, ProductOption, SalesMetrics
+from utils.matching import find_best_match
+from utils.normalizer import DataNormalizer
 
 class SkuIds(BaseModel):
     skuId: str
@@ -54,10 +57,13 @@ class SalesVelocity(BaseModel):
 class PoizonSeller(BaseSeller):
     SALT: str = "048a9c4943398714b356a696503d2d36"
 
-    def __init__(self, dutoken: str, cookie: str) -> None:
+    def __init__(self, dutoken: str | None = None, cookie: str | None = None) -> None:
         super().__init__(name="POIZON")
-        self.dutoken: str = dutoken
-        self.cookie: str = cookie
+        self.dutoken: str = dutoken or config.POIZON_DUTOKEN
+        self.cookie: str = cookie or config.POIZON_COOKIE
+
+        if not self.dutoken or not self.cookie:
+            print("[Warning] Poizon dutoken or cookie is missing. API calls may fail.")
 
         self.base_headers: dict[str, str] = {
             'accept': 'application/json',
@@ -139,52 +145,10 @@ class PoizonSeller(BaseSeller):
         return self._send_request(url, payload)
 
     def find_matching_product(self, product_list: list[dict[str, Any]], search_keyword: str) -> dict[str, Any] | None:
-        import difflib
-
-        if not product_list or not search_keyword:
-            return None
-
-        def normalize(text: str) -> str:
-            if not text:
-                return ""
-            return re.sub(r'[^a-z0-9]', '', str(text).lower())
-
-        target_keyword = normalize(search_keyword)
-        if not target_keyword:
-            return None
-
-        for product in product_list:
-            article_number = product.get('articleNumber')
-            if article_number and normalize(article_number) == target_keyword:
-                return product
-
-        for product in product_list:
-            article_number = str(product.get('articleNumber', ''))
-            if not article_number:
-                continue
-            parts = re.split(r'[^a-zA-Z0-9]', article_number)
-            normalized_parts = [normalize(p) for p in parts]
-            if target_keyword in normalized_parts:
-                return product
-
-        if len(target_keyword) <= 4:
-            return None
-
-        best_match: dict[str, Any] | None = None
-        highest_score: float = 0.0
-        THRESHOLD: float = 0.8
-
-        for product in product_list:
-            article_number = product.get('articleNumber')
-            if not article_number:
-                continue
-            norm_article = normalize(article_number)
-            score = difflib.SequenceMatcher(None, target_keyword, norm_article).ratio()
-            if score >= THRESHOLD and score > highest_score:
-                highest_score = score
-                best_match = product
-
-        return best_match
+        """
+        공통 유틸리티 함수를 사용하여 매칭되는 상품을 찾습니다.
+        """
+        return find_best_match(product_list, search_keyword, key_field="articleNumber")
 
     def query_sale_now_info(self, spu_id: int) -> dict[str, Any]:
         url = "https://seller.poizon.com/api/v1/h5/gw/adapter/pc/bidding/query/querySaleNowInfo"
@@ -389,9 +353,16 @@ class PoizonSeller(BaseSeller):
                 for spec in specs:
                     key = spec.get('sizeKey')
                     val_str = spec.get('skuProp', '')
+                    # 숫자만 추출 (예: "화이트 CHN 220" -> "220")
                     size_val = val_str.split(' ')[-1] if ' ' in val_str else val_str
+                    
                     if key == 'KR':
                         sku_info_data['size_kr'] = size_val
+                    elif key == 'CHN': # CHN 사이즈를 KR 사이즈로 취급
+                        # CHN 사이즈에서 숫자만 추출 (예: "220")
+                        nums = re.findall(r"[\d\.]+", val_str)
+                        if nums:
+                            sku_info_data['size_kr'] = nums[-1] # 보통 마지막 숫자가 사이즈
                     elif key == 'EU':
                         sku_info_data['size_eu'] = size_val
                     elif key == 'US Men':
@@ -506,9 +477,16 @@ class PoizonSeller(BaseSeller):
                 cn_leak_price = matched_price.cnPrice
                 is_cheaper_in = matched_price.isCheaperIn
 
+            # 사이즈 결정: KR 사이즈가 있으면 사용, 없으면 EU 사이즈 사용
+            final_size = sku.size_kr if sku.size_kr != "N/A" else sku.size_eu
+            
+            # EU 사이즈 정보 저장
+            eu_size = sku.size_eu if sku.size_eu != "N/A" else None
+
             standard_options.append(ProductOption(
                 sku_id=sku.skuId or "N/A",
-                size=sku.size_kr,
+                size=final_size,
+                eu_size=eu_size,  # EU 사이즈 추가
                 color=sku.color,
                 price=target_price,
                 currency="KRW",

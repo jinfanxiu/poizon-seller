@@ -11,11 +11,13 @@ class SalesMetrics(BaseModel):
 
 class ProductOption(BaseModel):
     sku_id: str
-    size: str
+    size: str  # KR Size (Normalized)
+    eu_size: str | None = None  # EU Size (Original from Poizon)
     color: str
     price: int
     currency: str = "KRW"
     stock_status: str = "IN_STOCK"
+    stock_quantity: int | None = None  # None: 재고 여유(표시 안함), 숫자: 남은 수량(표시 필요)
     image_url: str | None = None
 
     kr_leak_price: int | None = None

@@ -12,11 +12,24 @@ def check_password():
 
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        # Streamlit Cloud의 st.secrets 또는 환경 변수(Render)에서 비밀번호 가져오기
-        if "PASSWORD" in st.secrets:
-            correct_password = st.secrets["PASSWORD"]
-        else:
-            correct_password = os.environ.get("PASSWORD")
+        # 1. Render 환경 변수 우선 확인 (가장 중요)
+        # os.environ.get은 에러를 발생시키지 않고 없으면 None을 반환함
+        correct_password = os.environ.get("PASSWORD")
+        
+        # 2. 환경 변수가 없으면 Streamlit Secrets 확인 (로컬/Streamlit Cloud용)
+        # st.secrets 접근 시 파일이 없으면 에러가 나므로 try-except로 감쌈
+        if not correct_password:
+            try:
+                # 딕셔너리처럼 접근하되, secrets 자체가 로드되지 않는 상황 대비
+                correct_password = st.secrets.get("PASSWORD")
+            except Exception:
+                # StreamlitSecretNotFoundError 등 모든 에러 무시
+                correct_password = None
+
+        # 비밀번호가 어디에도 설정되지 않은 경우
+        if not correct_password:
+            st.error("비밀번호 설정이 되어있지 않습니다. (환경 변수 PASSWORD 또는 secrets.toml)")
+            return
 
         if st.session_state["password"] == correct_password:
             st.session_state["password_correct"] = True

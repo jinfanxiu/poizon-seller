@@ -34,6 +34,12 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add data/*.csv
-          git commit -m "Update data: $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-          git push
+          
+          # 데이터 파일이 있는지 확인
+          if ls data/*.csv 1> /dev/null 2>&1; then
+            git add data/*.csv
+            git commit -m "Update data: $(date +'%Y-%m-%d %H:%M:%S')"
+            git push
+          else
+            echo "No data files found to commit."
+          fi

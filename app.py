@@ -112,7 +112,7 @@ if show_profit_only:
 # 데이터프레임 정렬
 filtered_df = filtered_df.sort_values(by=['Has Profit', 'Profit', 'Model No', 'Size'], ascending=[False, False, True, True])
 
-# 컬럼 순서 변경 (요청사항 반영)
+# 컬럼 순서 변경
 display_cols = [
     "Status",
     "Musinsa Price",
@@ -176,6 +176,9 @@ for model_no in unique_models:
                 st.image(img_url, use_container_width=True)
             else:
                 st.text("No Image")
+            
+            # 모델 번호 복사 버튼 (st.code 사용)
+            st.code(model_no, language=None)
         
         with col2:
             # 요청한 컬럼만 선택하여 표시

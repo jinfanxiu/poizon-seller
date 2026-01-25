@@ -2,7 +2,7 @@ import csv
 import time
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import config
 from sellers.musinsa import MusinsaSeller, MusinsaRankingType
@@ -10,8 +10,18 @@ from sellers.poizon import PoizonSeller
 from utils.comparator import ProductComparator
 
 
+def get_kst_now():
+    """현재 시간을 한국 시간(KST)으로 반환합니다."""
+    # UTC 시간 가져오기
+    utc_now = datetime.now(timezone.utc)
+    # KST는 UTC+9
+    kst_now = utc_now + timedelta(hours=9)
+    return kst_now
+
+
 def main():
-    print(f"[{datetime.now()}] Starting data collection...")
+    kst_now = get_kst_now()
+    print(f"[{kst_now}] Starting data collection (KST)...")
 
     # 1. 초기화
     musinsa_seller = MusinsaSeller()
@@ -30,8 +40,8 @@ def main():
     output_dir = Path("data")
     output_dir.mkdir(exist_ok=True)
     
-    # 파일명에 시간 추가 (YYYY-MM-DD_HH-MM-SS.csv)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # 파일명에 한국 시간 적용 (YYYY-MM-DD_HH-MM-SS.csv)
+    timestamp = kst_now.strftime("%Y-%m-%d_%H-%M-%S")
     output_file = output_dir / f"{timestamp}.csv"
 
     # 2. 랭킹 수집 (중복 제거)
@@ -108,7 +118,7 @@ def main():
                     "Image URL": comparison_result.image_url,
                     "Musinsa URL": comp.musinsa_url,
                     "Has Profit": has_profit,
-                    "Updated At": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    "Updated At": kst_now.strftime("%Y-%m-%d %H:%M:%S")
                 })
             
             time.sleep(1.5)

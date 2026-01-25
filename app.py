@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import hashlib
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -10,30 +11,38 @@ load_dotenv()
 # 페이지 설정
 st.set_page_config(page_title="Poizon Seller Dashboard", layout="wide")
 
-# 1. 비밀번호 인증
+# 1. 비밀번호 인증 (세션 유지 기능 추가)
 def check_password():
     """Returns `True` if the user had the correct password."""
 
+    # 환경 변수에서 비밀번호 가져오기
+    correct_password = os.environ.get("PASSWORD")
+    if not correct_password:
+        try:
+            correct_password = st.secrets.get("PASSWORD")
+        except Exception:
+            correct_password = None
+
+    if not correct_password:
+        st.error("비밀번호 설정이 되어있지 않습니다. (환경 변수 PASSWORD 또는 secrets.toml)")
+        return False
+
+    # 비밀번호 해시 생성 (URL에 노출되므로 원본 대신 해시 사용)
+    password_hash = hashlib.sha256(correct_password.encode()).hexdigest()
+
+    # URL 쿼리 파라미터 확인 (새로고침 시 유지용)
+    query_params = st.query_params
+    if "auth" in query_params and query_params["auth"] == password_hash:
+        st.session_state["password_correct"] = True
+        return True
+
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        # 1. Render 환경 변수 우선 확인 (가장 중요)
-        correct_password = os.environ.get("PASSWORD")
-        
-        # 2. 환경 변수가 없으면 Streamlit Secrets 확인 (로컬/Streamlit Cloud용)
-        if not correct_password:
-            try:
-                correct_password = st.secrets.get("PASSWORD")
-            except Exception:
-                correct_password = None
-
-        # 비밀번호가 어디에도 설정되지 않은 경우
-        if not correct_password:
-            st.error("비밀번호 설정이 되어있지 않습니다. (환경 변수 PASSWORD 또는 secrets.toml)")
-            return
-
         if st.session_state["password"] == correct_password:
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Don't store the password
+            # URL에 인증 토큰 추가
+            st.query_params["auth"] = password_hash
         else:
             st.session_state["password_correct"] = False
 
@@ -58,11 +67,10 @@ if not check_password():
     st.stop()
 
 # 2. 데이터 로드 및 전처리
-def get_available_data_files():
+def get_available_dates():
     data_dir = Path("data")
     if not data_dir.exists():
         return []
-    # 파일명 형식: YYYY-MM-DD_HH-MM-SS.csv
     files = sorted(data_dir.glob("*.csv"), reverse=True)
     return [f.name for f in files]
 
@@ -83,15 +91,12 @@ def load_data(filename):
 
 st.title("👟 Poizon Seller Dashboard")
 
-# 날짜(파일) 선택
-available_files = get_available_data_files()
+# 날짜 선택
+available_files = get_available_dates()
 if not available_files:
     st.warning("아직 데이터가 수집되지 않았습니다.")
     st.stop()
 
-# 파일명에서 보기 좋은 날짜 형식으로 변환하여 보여줄 수도 있지만,
-# 파일명 자체가 시간순 정렬되어 있으므로 그대로 사용해도 무방함.
-# 예: 2023-10-27_15-30-00.csv
 selected_file = st.selectbox("Select Data (Date & Time)", available_files)
 df = load_data(selected_file)
 
@@ -99,7 +104,6 @@ if df is None:
     st.error("데이터를 불러올 수 없습니다.")
     st.stop()
 
-# Updated At 컬럼이 있으면 사용, 없으면 파일명에서 유추
 last_updated = df['Updated At'].iloc[0] if 'Updated At' in df.columns else selected_file.replace(".csv", "")
 st.write(f"Data Loaded: {selected_file} (Last Updated: {last_updated})")
 
@@ -197,6 +201,7 @@ for model_no in unique_models:
                 model_group[cols_to_show],
                 use_container_width=True,
                 hide_index=True,
+                column_order=cols_to_show, # 컬럼 순서 고정
                 column_config={
                     "Musinsa URL": st.column_config.LinkColumn("Link"),
                     "Status": st.column_config.TextColumn(

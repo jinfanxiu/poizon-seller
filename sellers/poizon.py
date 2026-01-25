@@ -59,8 +59,13 @@ class PoizonSeller(BaseSeller):
 
     def __init__(self, dutoken: str | None = None, cookie: str | None = None) -> None:
         super().__init__(name="POIZON")
-        self.dutoken: str = dutoken or config.POIZON_DUTOKEN
-        self.cookie: str = cookie or config.POIZON_COOKIE
+        # 인자로 전달받지 않으면 config에서 가져옴
+        raw_dutoken = dutoken or config.POIZON_DUTOKEN
+        raw_cookie = cookie or config.POIZON_COOKIE
+        
+        # 공백 및 줄바꿈 제거 (GitHub Secrets 오류 방지)
+        self.dutoken: str = raw_dutoken.strip() if raw_dutoken else ""
+        self.cookie: str = raw_cookie.strip() if raw_cookie else ""
 
         if not self.dutoken or not self.cookie:
             print("[Warning] Poizon dutoken or cookie is missing. API calls may fail.")

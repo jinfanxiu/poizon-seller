@@ -58,16 +58,17 @@ if not check_password():
     st.stop()
 
 # 2. 데이터 로드 및 전처리
-def get_available_dates():
+def get_available_data_files():
     data_dir = Path("data")
     if not data_dir.exists():
         return []
+    # 파일명 형식: YYYY-MM-DD_HH-MM-SS.csv
     files = sorted(data_dir.glob("*.csv"), reverse=True)
-    return [f.stem for f in files]
+    return [f.name for f in files]
 
 @st.cache_data(ttl=600)
-def load_data(date_str):
-    csv_path = f"data/{date_str}.csv"
+def load_data(filename):
+    csv_path = f"data/{filename}"
     if not os.path.exists(csv_path):
         return None
     
@@ -82,20 +83,25 @@ def load_data(date_str):
 
 st.title("👟 Poizon Seller Dashboard")
 
-# 날짜 선택
-available_dates = get_available_dates()
-if not available_dates:
+# 날짜(파일) 선택
+available_files = get_available_data_files()
+if not available_files:
     st.warning("아직 데이터가 수집되지 않았습니다.")
     st.stop()
 
-selected_date = st.selectbox("Select Date", available_dates)
-df = load_data(selected_date)
+# 파일명에서 보기 좋은 날짜 형식으로 변환하여 보여줄 수도 있지만,
+# 파일명 자체가 시간순 정렬되어 있으므로 그대로 사용해도 무방함.
+# 예: 2023-10-27_15-30-00.csv
+selected_file = st.selectbox("Select Data (Date & Time)", available_files)
+df = load_data(selected_file)
 
 if df is None:
     st.error("데이터를 불러올 수 없습니다.")
     st.stop()
 
-st.write(f"Data Loaded: {selected_date} (Last Updated: {df['Updated At'].iloc[0]})")
+# Updated At 컬럼이 있으면 사용, 없으면 파일명에서 유추
+last_updated = df['Updated At'].iloc[0] if 'Updated At' in df.columns else selected_file.replace(".csv", "")
+st.write(f"Data Loaded: {selected_file} (Last Updated: {last_updated})")
 
 # 3. 데이터 가공 (정렬 및 포맷팅)
 # 필터링 옵션
@@ -112,7 +118,7 @@ if show_profit_only:
 # 데이터프레임 정렬
 filtered_df = filtered_df.sort_values(by=['Has Profit', 'Profit', 'Model No', 'Size'], ascending=[False, False, True, True])
 
-# 컬럼 순서 변경
+# 컬럼 순서 및 이름 정리
 display_cols = [
     "Status",
     "Musinsa Price",
@@ -177,7 +183,7 @@ for model_no in unique_models:
             else:
                 st.text("No Image")
             
-            # 모델 번호 복사 버튼 (st.code 사용)
+            # 모델 번호 복사 버튼
             st.code(model_no, language=None)
         
         with col2:

@@ -26,12 +26,13 @@ def main():
     poizon_seller = PoizonSeller(dutoken=dutoken, cookie=cookie)
     comparator = ProductComparator(musinsa_seller, poizon_seller)
 
-    # 결과 저장 경로 설정 (날짜별 파일)
+    # 결과 저장 경로 설정 (날짜_시간 파일)
     output_dir = Path("data")
     output_dir.mkdir(exist_ok=True)
     
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    output_file = output_dir / f"{today_str}.csv"
+    # 파일명에 시간 추가 (YYYY-MM-DD_HH-MM-SS.csv)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    output_file = output_dir / f"{timestamp}.csv"
 
     # 2. 랭킹 수집 (중복 제거)
     target_brands = ["나이키", "아디다스", "데상트"]

@@ -5,11 +5,13 @@ from typing import Any
 
 def normalize_text(text: str) -> str:
     """
-    문자열에서 영문자와 숫자만 남기고 소문자로 변환합니다.
+    문자열에서 영문자, 숫자, 한글만 남기고 소문자로 변환합니다.
+    공백과 특수문자는 제거됩니다.
     """
     if not text:
         return ""
-    return re.sub(r"[^a-z0-9]", "", str(text).lower())
+    # 한글(가-힣), 영문(a-z), 숫자(0-9)만 남김
+    return re.sub(r"[^a-z0-9가-힣]", "", str(text).lower())
 
 
 def find_best_match(
@@ -50,7 +52,7 @@ def find_best_match(
             continue
         
         # 특수문자 기준으로 분리 (예: "FN3889-010" -> ["fn3889", "010"])
-        parts = re.split(r"[^a-zA-Z0-9]", value)
+        parts = re.split(r"[^a-zA-Z0-9가-힣]", value)
         normalized_parts = [normalize_text(p) for p in parts]
         
         if normalized_target in normalized_parts:

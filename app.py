@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 import hashlib
+import requests
+import time
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -10,6 +12,12 @@ load_dotenv()
 
 # 페이지 설정
 st.set_page_config(page_title="Poizon Seller Dashboard", layout="wide")
+
+# GitHub 설정
+GITHUB_OWNER = "jinfanxiu"
+GITHUB_REPO = "poizon-seller"
+WORKFLOW_FILE = "schedule.yml"
+GH_TOKEN = os.environ.get("GH_TOKEN")
 
 # 1. 비밀번호 인증 (세션 유지 기능 추가)
 def check_password():
@@ -66,6 +74,58 @@ def check_password():
 if not check_password():
     st.stop()
 
+# GitHub API 함수
+def get_workflow_status():
+    """현재 워크플로우 실행 상태를 확인합니다."""
+    if not GH_TOKEN:
+        return "unknown", "GitHub Token not set"
+        
+    url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/actions/runs"
+    headers = {
+        "Authorization": f"Bearer {GH_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    params = {
+        "status": "in_progress" # 실행 중인 것만 조회
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        if response.status_code == 200:
+            runs = response.json().get("workflow_runs", [])
+            # schedule.yml 워크플로우인지 확인
+            for run in runs:
+                if run["path"].endswith(WORKFLOW_FILE):
+                    return "running", run["html_url"]
+            return "idle", None
+        else:
+            return "error", f"API Error: {response.status_code}"
+    except Exception as e:
+        return "error", str(e)
+
+def trigger_workflow():
+    """워크플로우 실행을 요청합니다."""
+    if not GH_TOKEN:
+        return False, "GitHub Token not set"
+        
+    url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/actions/workflows/{WORKFLOW_FILE}/dispatches"
+    headers = {
+        "Authorization": f"Bearer {GH_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    data = {
+        "ref": "main" # 실행할 브랜치
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 204:
+            return True, "Success"
+        else:
+            return False, f"API Error: {response.status_code} - {response.text}"
+    except Exception as e:
+        return False, str(e)
+
 # 2. 데이터 로드 및 전처리
 def get_available_dates():
     data_dir = Path("data")
@@ -90,6 +150,29 @@ def load_data(filename):
     return df
 
 st.title("👟 Poizon Seller Dashboard")
+
+# 상단 컨트롤 패널 (업데이트 버튼 등)
+col_title, col_btn = st.columns([3, 1])
+
+with col_btn:
+    # 워크플로우 상태 확인
+    status, run_url = get_workflow_status()
+    
+    if status == "running":
+        st.info("🔄 업데이트 진행 중...")
+        if run_url:
+            st.markdown(f"[진행 상황 보기]({run_url})")
+    elif status == "error":
+        st.error("GitHub API 오류")
+    else:
+        if st.button("🔄 데이터 업데이트 요청"):
+            success, msg = trigger_workflow()
+            if success:
+                st.success("업데이트 요청 완료! (약 5분 소요)")
+                time.sleep(2)
+                st.rerun()
+            else:
+                st.error(f"요청 실패: {msg}")
 
 # 날짜 선택
 available_files = get_available_dates()
@@ -201,7 +284,7 @@ for model_no in unique_models:
                 model_group[cols_to_show],
                 use_container_width=True,
                 hide_index=True,
-                column_order=cols_to_show, # 컬럼 순서 고정
+                column_order=cols_to_show,
                 column_config={
                     "Musinsa URL": st.column_config.LinkColumn("Link"),
                     "Status": st.column_config.TextColumn(

@@ -242,10 +242,26 @@ class MusinsaSeller(BaseSeller):
             goods_nm = meta_data.get("goodsNm", "")
             style_no = meta_data.get("styleNo", "") # 스타일 번호 추출
             goods_images = meta_data.get("goodsImages", [])
-            image_url = (
-                f"https:{goods_images[0]['imageUrl']}" if goods_images else ""
-            )
             
+            # 이미지 URL 수정: https: 추가
+            image_url = ""
+            if goods_images:
+                raw_url = goods_images[0]['imageUrl']
+                if raw_url.startswith("//"):
+                    image_url = f"https:{raw_url}"
+                elif raw_url.startswith("/"):
+                    image_url = f"https:{raw_url}" # 이미 /가 있으므로 https:만 붙임 (주의: //가 아닐 경우)
+                    # 하지만 보통 //image... 형태이거나 /images... 형태임
+                    # /images... 형태라면 도메인이 필요할 수 있음 (musinsa.com)
+                    # 일단 기존 로직에서 슬래시가 하나 부족했던 것 같으므로 https://를 붙여봄
+                    if not raw_url.startswith("//"):
+                         image_url = f"https:/{raw_url}" # 기존 로직이 이거였음 -> https:/images...
+                         # 올바른 형태: https://image.msscdn.net... 또는 https://www.musinsa.com...
+                         # 만약 도메인 없는 상대 경로라면:
+                         image_url = f"https://image.msscdn.net{raw_url}" # 도메인 가정
+                else:
+                    image_url = raw_url
+
             # goodsPrice가 None일 수 있으므로 안전하게 처리
             goods_price = meta_data.get("goodsPrice") or {}
             
@@ -486,8 +502,14 @@ class MusinsaSeller(BaseSeller):
                 brand_name = info.get("brandName", "")
 
                 # Brand filtering
-                if brand_names and brand_name not in brand_names:
-                    continue
+                if brand_names:
+                    normalized_brand = normalize_text(brand_name)
+                    normalized_targets = [normalize_text(b) for b in brand_names]
+                    
+                    # 포함 관계 확인 (예: "나이키" in "나이키(Nike)")
+                    is_matched = any(t in normalized_brand or normalized_brand in t for t in normalized_targets)
+                    if not is_matched:
+                        continue
 
                 product_id = str(item.get("id", ""))
                 product_name = info.get("productName", "")

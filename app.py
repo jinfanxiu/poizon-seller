@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# .env 파일 로드 (로컬 실행 시 필요)
+load_dotenv()
 
 # 페이지 설정
 st.set_page_config(page_title="Poizon Seller Dashboard", layout="wide")
@@ -13,17 +17,13 @@ def check_password():
     def password_entered():
         """Checks whether a password entered by the user is correct."""
         # 1. Render 환경 변수 우선 확인 (가장 중요)
-        # os.environ.get은 에러를 발생시키지 않고 없으면 None을 반환함
         correct_password = os.environ.get("PASSWORD")
         
         # 2. 환경 변수가 없으면 Streamlit Secrets 확인 (로컬/Streamlit Cloud용)
-        # st.secrets 접근 시 파일이 없으면 에러가 나므로 try-except로 감쌈
         if not correct_password:
             try:
-                # 딕셔너리처럼 접근하되, secrets 자체가 로드되지 않는 상황 대비
                 correct_password = st.secrets.get("PASSWORD")
             except Exception:
-                # StreamlitSecretNotFoundError 등 모든 에러 무시
                 correct_password = None
 
         # 비밀번호가 어디에도 설정되지 않은 경우
@@ -72,6 +72,12 @@ def load_data(date_str):
         return None
     
     df = pd.read_csv(csv_path)
+    
+    # 이미지 URL 보정
+    if 'Image URL' in df.columns:
+        df['Image URL'] = df['Image URL'].astype(str).str.replace('https:/images', 'https://image.msscdn.net/images', regex=False)
+        df['Image URL'] = df['Image URL'].astype(str).str.replace('https://images', 'https://image.msscdn.net/images', regex=False)
+        
     return df
 
 st.title("👟 Poizon Seller Dashboard")
@@ -106,11 +112,20 @@ if show_profit_only:
 # 데이터프레임 정렬
 filtered_df = filtered_df.sort_values(by=['Has Profit', 'Profit', 'Model No', 'Size'], ascending=[False, False, True, True])
 
-# 컬럼 순서 및 이름 정리
+# 컬럼 순서 변경 (요청사항 반영)
 display_cols = [
-    "Brand", "Product Name", "Model No", "Size", "EU Size", "Color",
-    "Musinsa Price", "Musinsa Stock", "Poizon Price", "Poizon Stock",
-    "Profit", "Margin (%)", "Status", "Poizon Score", "Poizon Rank", "Musinsa URL"
+    "Status",
+    "Musinsa Price",
+    "Poizon Price",
+    "Profit",
+    "Size",
+    "Margin (%)",
+    "EU Size",
+    "Color",
+    "Poizon Stock",
+    "Musinsa URL",
+    # 내부 정렬용 컬럼들 (표시 안함)
+    "Brand", "Product Name", "Model No", "Image URL", "Poizon Score", "Poizon Rank"
 ]
 
 # 포맷팅 함수
@@ -126,12 +141,20 @@ def format_percent(val):
     except:
         return val
 
+def format_status(val):
+    if val == "PROFIT":
+        return "✅ PROFIT"
+    elif val == "LOSS":
+        return "❌ LOSS"
+    return val
+
 # 표시용 데이터프레임 생성
-display_df = filtered_df[display_cols].copy()
+display_df = filtered_df.copy()
 display_df['Musinsa Price'] = display_df['Musinsa Price'].apply(format_currency)
 display_df['Poizon Price'] = display_df['Poizon Price'].apply(format_currency)
 display_df['Profit'] = display_df['Profit'].apply(format_currency)
 display_df['Margin (%)'] = display_df['Margin (%)'].apply(format_percent)
+display_df['Status'] = display_df['Status'].apply(format_status)
 
 # 4. 테이블 표시 (모델별 그룹화 효과)
 unique_models = filtered_df[['Model No', 'Has Profit', 'Profit']].drop_duplicates(subset=['Model No'])['Model No'].tolist()
@@ -150,22 +173,26 @@ for model_no in unique_models:
         
         with col1:
             if pd.notna(img_url) and img_url.startswith("http"):
-                st.image(img_url, width=150)
+                st.image(img_url, use_container_width=True)
             else:
                 st.text("No Image")
         
         with col2:
-            # 스타일링된 데이터프레임 표시
+            # 요청한 컬럼만 선택하여 표시
+            cols_to_show = [
+                "Status", "Musinsa Price", "Poizon Price", "Profit", 
+                "Size", "Margin (%)", "EU Size", "Color", "Poizon Stock", "Musinsa URL"
+            ]
+            
             st.dataframe(
-                model_group.drop(columns=['Brand', 'Product Name', 'Model No', 'Image URL', 'Poizon Score', 'Poizon Rank'], errors='ignore'),
+                model_group[cols_to_show],
                 use_container_width=True,
                 hide_index=True,
                 column_config={
                     "Musinsa URL": st.column_config.LinkColumn("Link"),
                     "Status": st.column_config.TextColumn(
                         "Status",
-                        help="Profit status",
-                        validate="^PROFIT|LOSS|N/A$"
+                        help="Profit status"
                     )
                 }
             )

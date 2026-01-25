@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from models.product import ProductInfo
+from typing import Any
 
 class BaseSeller(ABC):
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str):
         self.name = name
 
     @abstractmethod
@@ -10,5 +10,5 @@ class BaseSeller(ABC):
         pass
 
     @abstractmethod
-    def get_product_info(self, product_id: str) -> ProductInfo | None:
+    def get_product_info(self, product_id: str) -> Any:
         pass

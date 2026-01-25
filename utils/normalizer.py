@@ -23,8 +23,6 @@ class DataNormalizer:
             norm_color = parts[-1]
 
         # 3. 매핑 테이블 조회
-        # 긴 단어부터 매칭하기 위해 매핑 로직을 정교하게 처리할 수도 있지만,
-        # 여기서는 포함 여부로 간단히 처리
         for standard, synonyms in COLOR_MAP.items():
             for syn in synonyms:
                 if syn in norm_color:
@@ -41,6 +39,23 @@ class DataNormalizer:
             return "N/A"
             
         s = str(raw_size).upper().strip()
+        
+        # 0. 특수 패턴 처리 (예: A/XS -> XS)
+        if "/" in s:
+            parts = s.split("/")
+            # 분리된 부분 중 의류 사이즈 맵에 있는 것이 있으면 사용
+            for part in parts:
+                part = part.strip()
+                if part in CLOTHING_SIZE_MAP:
+                    s = part
+                    break
+                # 혹은 숫자만 있는 경우 (예: KR/260)
+                if part.isdigit():
+                    s = part
+                    break
+            # 매칭되는게 없으면 마지막 부분 사용 (보통 뒤쪽이 실제 사이즈)
+            else:
+                s = parts[-1].strip()
         
         # 1. 의류 사이즈 매핑
         if s in CLOTHING_SIZE_MAP:

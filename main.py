@@ -8,6 +8,7 @@ import config
 from sellers.musinsa import MusinsaSeller, MusinsaRankingType
 from sellers.poizon import PoizonSeller
 from utils.comparator import ProductComparator
+from utils.constants import TARGET_BRANDS
 
 
 def get_kst_now():
@@ -17,6 +18,30 @@ def get_kst_now():
     # KST는 UTC+9
     kst_now = utc_now + timedelta(hours=9)
     return kst_now
+
+
+def cleanup_old_files(directory: Path, keep_count: int = 5):
+    """
+    지정된 디렉토리에서 오래된 CSV 파일을 삭제하여 최신 파일만 남깁니다.
+    """
+    if not directory.exists():
+        return
+
+    # CSV 파일 목록 가져오기
+    files = sorted(directory.glob("*.csv"), key=os.path.getmtime)
+    
+    if len(files) > keep_count:
+        files_to_delete = files[:-keep_count]
+        print(f"\n[Cleanup] Found {len(files)} files. Deleting {len(files_to_delete)} old files...")
+        
+        for file in files_to_delete:
+            try:
+                file.unlink()
+                print(f"  - Deleted: {file.name}")
+            except Exception as e:
+                print(f"  - Failed to delete {file.name}: {e}")
+    else:
+        print(f"\n[Cleanup] File count ({len(files)}) is within limit ({keep_count}). No deletion needed.")
 
 
 def main():
@@ -45,7 +70,6 @@ def main():
     output_file = output_dir / f"{timestamp}.csv"
 
     # 2. 랭킹 수집 (중복 제거)
-    target_brands = ["나이키", "아디다스", "데상트"]
     ranking_types = [
         MusinsaRankingType.NEW,
         MusinsaRankingType.RISING,
@@ -54,10 +78,10 @@ def main():
     
     unique_products = {}  # product_id -> item
     
-    print(f"Fetching rankings for {target_brands}...")
+    print(f"Fetching rankings for {TARGET_BRANDS}...")
     for r_type in ranking_types:
         print(f"  - Fetching {r_type.name} ranking...")
-        rankings = musinsa_seller.fetch_ranking(r_type, brand_names=target_brands)
+        rankings = musinsa_seller.fetch_ranking(r_type, brand_names=TARGET_BRANDS)
         if rankings:
             for item in rankings:
                 if item.product_id not in unique_products:
@@ -141,6 +165,10 @@ def main():
             writer.writeheader()
             writer.writerows(results)
         print(f"Saved {len(results)} rows to {output_file}")
+        
+        # 5. 오래된 파일 정리
+        cleanup_old_files(output_dir, keep_count=5)
+
     else:
         print("No results to save.")
 

@@ -8,6 +8,7 @@ import config
 from sellers.musinsa import MusinsaSeller, MusinsaRankingType
 from sellers.poizon import PoizonSeller
 from utils.comparator import ProductComparator
+from utils.constants import TARGET_BRANDS
 
 
 class TestRankingComparison(unittest.TestCase):
@@ -32,11 +33,10 @@ class TestRankingComparison(unittest.TestCase):
 
     def test_compare_ranking_items(self):
         # 1. 랭킹 가져오기 & 필터링
-        target_brands = ["나이키", "아디다스", "데상트"]
-        print(f"\n[Step 1] Fetching ranking filtered by {target_brands}...")
+        print(f"\n[Step 1] Fetching ranking filtered by {TARGET_BRANDS}...")
         
         rankings = self.musinsa_seller.fetch_ranking(
-            MusinsaRankingType.NEW, brand_names=target_brands
+            MusinsaRankingType.ALL, brand_names=TARGET_BRANDS
         )
         
         if not rankings:

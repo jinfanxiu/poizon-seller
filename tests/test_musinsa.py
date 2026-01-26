@@ -1,6 +1,7 @@
 import unittest
 from sellers.musinsa import MusinsaSeller, MusinsaRankingType
 from utils.matching import normalize_text
+from utils.constants import TARGET_BRANDS
 
 
 class TestMusinsaSeller(unittest.TestCase):
@@ -35,14 +36,13 @@ class TestMusinsaSeller(unittest.TestCase):
 
     def test_fetch_ranking_filtered(self):
         """브랜드 필터링 랭킹 조회 테스트"""
-        target_brands = ["나이키", "아디다스", "데상트"]
-        print(f"\n[Test] Fetching ranking filtered by {target_brands}...")
+        print(f"\n[Test] Fetching ranking filtered by {TARGET_BRANDS}...")
         rankings = self.seller.fetch_ranking(
-            MusinsaRankingType.ALL, brand_names=target_brands
+            MusinsaRankingType.ALL, brand_names=TARGET_BRANDS
         )
         
         if rankings:
-            normalized_targets = [normalize_text(b) for b in target_brands]
+            normalized_targets = [normalize_text(b) for b in TARGET_BRANDS]
             for item in rankings:
                 # 필터링된 결과의 브랜드가 타겟 브랜드 목록에 포함되는지 확인 (정규화 후 비교)
                 item_brand_norm = normalize_text(item.brand_name)
@@ -53,12 +53,12 @@ class TestMusinsaSeller(unittest.TestCase):
                 
                 # self.assertTrue(is_matched, f"Brand {item.brand_name} is not in target list")
             
-            print(f"  Found {len(rankings)} items for {target_brands}")
+            print(f"  Found {len(rankings)} items for {TARGET_BRANDS}")
             # 상위 5개만 출력
-            for item in rankings:
+            for item in rankings[:5]:
                 print(f"    - {item.brand_name}: {item.product_name}")
         else:
-            print(f"  No items found for {target_brands} (might be not in top ranking)")
+            print(f"  No items found for {TARGET_BRANDS} (might be not in top ranking)")
 
     def test_search_product_success(self):
         """상품 검색 성공 테스트"""

@@ -2,8 +2,10 @@ name: Daily Data Collection
 
 on:
   schedule:
-    - cron: '0 0,3,6,9,12,15,18,21 * * *'
-  workflow_dispatch:
+    # 3시간마다 실행 (UTC 기준 0시부터 3시간 간격)
+    # 한국 시간(KST) 기준: 09:00, 12:00, 15:00, 18:00, 21:00, 00:00, 03:00, 06:00
+    - cron: '0 */3 * * *'
+  workflow_dispatch: # 수동 실행 가능
 
 jobs:
   run-script:
@@ -36,7 +38,9 @@ jobs:
           
           # 데이터 파일이 있는지 확인
           if ls data/*.csv 1> /dev/null 2>&1; then
-            git add data/*.csv
+            # 삭제된 파일까지 포함하여 모든 변경 사항 스테이징
+            git add -A data/
+
             git commit -m "Update data: $(date +'%Y-%m-%d %H:%M:%S')"
             
             # 원격 저장소 변경 사항 가져오기 (충돌 방지)

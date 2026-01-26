@@ -11,8 +11,8 @@ class DataNormalizer:
         if not raw_color or raw_color.upper() == "ONE COLOR":
             return "onecolor"
 
-        # 1. 전처리: 소문자 변환, 공백 제거
-        norm_color = raw_color.lower().replace(" ", "")
+        # 1. 전처리: 소문자 변환
+        norm_color = raw_color.lower()
         
         if norm_color == "onecolor":
             return "onecolor"
@@ -22,13 +22,16 @@ class DataNormalizer:
             parts = norm_color.split("_")
             norm_color = parts[-1]
 
-        # 3. 매핑 테이블 조회
+        # 3. 특수문자 제거 및 공백 처리 (beige-black -> beigeblack)
+        clean_color = re.sub(r"[^a-z가-힣]", "", norm_color) # 한글도 유지해야 매핑 테이블에서 찾음
+        
+        # 4. 매핑 테이블 조회
         for standard, synonyms in COLOR_MAP.items():
             for syn in synonyms:
-                if syn in norm_color:
+                if syn in clean_color:
                     return standard
         
-        return norm_color
+        return clean_color
 
     @staticmethod
     def normalize_size(raw_size: str) -> str:
@@ -43,17 +46,14 @@ class DataNormalizer:
         # 0. 특수 패턴 처리 (예: A/XS -> XS)
         if "/" in s:
             parts = s.split("/")
-            # 분리된 부분 중 의류 사이즈 맵에 있는 것이 있으면 사용
             for part in parts:
                 part = part.strip()
                 if part in CLOTHING_SIZE_MAP:
                     s = part
                     break
-                # 혹은 숫자만 있는 경우 (예: KR/260)
                 if part.isdigit():
                     s = part
                     break
-            # 매칭되는게 없으면 마지막 부분 사용 (보통 뒤쪽이 실제 사이즈)
             else:
                 s = parts[-1].strip()
         
@@ -79,31 +79,23 @@ class DataNormalizer:
             
         # 30 ~ 50: EU 사이즈로 간주하고 변환 시도
         if 30 <= val <= 50:
-            # 정확한 매핑이 있으면 사용
             if val_str in EU_TO_KR_MAP:
                 return EU_TO_KR_MAP[val_str]
-            # 없으면 근사치 계산 (EU -> KR 공식: (EU - 32) * 10 ? 브랜드마다 다름)
-            # 여기서는 매핑 테이블에 없으면 원본 반환하거나 보수적으로 처리
             return val_str
             
-        # 15 이하: US/UK 사이즈 (변환 로직 필요하지만 복잡하므로 일단 원본 반환)
-        
         return str(int(val)) if val.is_integer() else str(val)
 
     @staticmethod
     def size_to_float(size_str: str) -> float:
         """정렬을 위한 사이즈 숫자 변환"""
         try:
-            # 이미 정규화된 사이즈(KR mm)라면 바로 변환
             if size_str.isdigit():
                 return float(size_str)
                 
-            # 의류 사이즈 매핑
             norm_size = size_str.upper().strip()
             if norm_size in CLOTHING_SIZE_MAP:
                 return float(CLOTHING_SIZE_MAP[norm_size])
             
-            # 숫자 추출
             nums = re.findall(r"[\d\.]+", size_str)
             if nums:
                 return float(nums[0])

@@ -6,7 +6,7 @@ class TestPoizonSeller(unittest.TestCase):
     def setUp(self):
         # config.py에서 설정을 자동으로 가져옵니다.
         self.seller = PoizonSeller()
-        self.test_model_no = "FN3889-010"
+        self.test_model_no = "SR123SDJ11"
 
     def test_search_product(self):
         """상품 검색 테스트"""

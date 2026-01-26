@@ -12,34 +12,6 @@ class ProductComparator:
         self.musinsa = musinsa_seller
         self.poizon = poizon_seller
 
-    def _normalize_color(self, color: str) -> str:
-        """
-        색상 문자열을 정규화합니다.
-        """
-        if not color or color.upper() == "ONE COLOR":
-            return "onecolor"
-        
-        # 1. 전처리: 소문자 변환
-        norm_color = color.lower()
-        
-        # 2. 무신사 패턴 처리 (예: BLK0_BLACK -> black, BGBK_BEIGE-BLACK -> beige-black)
-        if "_" in norm_color:
-            parts = norm_color.split("_")
-            norm_color = parts[-1]
-
-        # 3. 특수문자 제거 및 공백 처리
-        clean_color = re.sub(r"[^a-z]", "", norm_color)
-        
-        # 4. 매핑 테이블 조회
-        from utils.constants import COLOR_MAP
-        
-        for standard, synonyms in COLOR_MAP.items():
-            for syn in synonyms:
-                if syn in clean_color:
-                    return standard
-        
-        return clean_color
-
     def compare_product(self, keyword: str) -> ProductComparisonResult | None:
         """
         키워드(모델 번호)로 무신사와 Poizon 상품을 검색하고 가격을 비교합니다.
@@ -67,8 +39,10 @@ class ProductComparator:
         for info in musinsa_infos:
             for opt in info.options:
                 norm_size = DataNormalizer.normalize_size(opt.size)
-                norm_color = self._normalize_color(opt.color)
+                norm_color = DataNormalizer.normalize_color(opt.color)
                 key = (norm_size, norm_color)
+                
+                # print(f"Musinsa Key: {key} (Original: {opt.size}, {opt.color})") # Debug
                 
                 if key not in musinsa_map:
                     musinsa_map[key] = opt
@@ -86,8 +60,10 @@ class ProductComparator:
         poizon_map = {}
         for opt in poizon_info.options:
             norm_size = DataNormalizer.normalize_size(opt.size)
-            norm_color = self._normalize_color(opt.color)
+            norm_color = DataNormalizer.normalize_color(opt.color)
             key = (norm_size, norm_color)
+            
+            # print(f"Poizon Key: {key} (Original: {opt.size}, {opt.color})") # Debug
             
             if key not in poizon_map:
                 poizon_map[key] = opt
@@ -101,14 +77,14 @@ class ProductComparator:
         
         processed_poizon_keys = set()
 
-        # 1차: 정확한 매칭 (Size, Color)
+        # 1차: 정확한 매칭
         for key in list(merged_keys):
             if key in musinsa_map and key in poizon_map:
                 final_comparisons[key] = (musinsa_map[key], poizon_map[key])
                 processed_poizon_keys.add(key)
                 merged_keys.remove(key)
 
-        # 2차: 유연한 매칭 (Size 또는 Color가 다른 경우)
+        # 2차: 유연한 매칭
         for m_key in list(musinsa_map.keys()):
             if m_key in final_comparisons: continue
             
@@ -116,22 +92,18 @@ class ProductComparator:
             m_opt = musinsa_map[m_key]
             
             best_p_match = None
-            
-            # Poizon 후보군 (아직 매칭 안됨)
             candidates = [k for k in poizon_map.keys() if k not in processed_poizon_keys]
             
             for p_key in candidates:
                 p_size, p_color = p_key
                 p_opt_candidate = poizon_map[p_key]
                 
-                # 사이즈 매칭 로직 개선
+                # 사이즈 매칭 로직
                 is_size_match = False
                 if m_size == p_size:
                     is_size_match = True
-                # 무신사 사이즈를 EU/US로 변환하여 Poizon의 EU 사이즈와 비교
                 elif m_size in KR_TO_CLOTHING_SIZE_MAP:
                     converted_size = KR_TO_CLOTHING_SIZE_MAP[m_size]
-                    # p_size와 비교하거나, p_opt의 eu_size와 비교
                     if converted_size == p_size:
                         is_size_match = True
                     elif p_opt_candidate.eu_size and converted_size == p_opt_candidate.eu_size:

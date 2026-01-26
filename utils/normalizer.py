@@ -61,10 +61,17 @@ class DataNormalizer:
         if s in CLOTHING_SIZE_MAP:
             return CLOTHING_SIZE_MAP[s]
             
-        # 2. 숫자 추출
+        # 2. 색상명이 사이즈에 들어간 경우 (잡화 등) -> FREE로 변환
+        # COLOR_MAP의 모든 동의어를 확인
+        s_lower = s.lower()
+        for synonyms in COLOR_MAP.values():
+            if s_lower in synonyms:
+                return "FREE"
+            
+        # 3. 숫자 추출
         nums = re.findall(r"[\d\.]+", s)
         if not nums:
-            return s  # 숫자가 없으면 원본 반환
+            return s  # 숫자가 없으면 원본 반환 (FREE 등)
             
         val_str = nums[0]
         try:
@@ -72,7 +79,7 @@ class DataNormalizer:
         except ValueError:
             return s
 
-        # 3. 범위 기반 판단 (신발 사이즈)
+        # 4. 범위 기반 판단 (신발 사이즈)
         # 200 이상: 이미 KR(mm)
         if val >= 200:
             return str(int(val))
@@ -89,6 +96,9 @@ class DataNormalizer:
     def size_to_float(size_str: str) -> float:
         """정렬을 위한 사이즈 숫자 변환"""
         try:
+            if size_str == "FREE":
+                return 0.0 # FREE는 맨 앞으로
+
             if size_str.isdigit():
                 return float(size_str)
                 

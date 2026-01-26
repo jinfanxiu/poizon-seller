@@ -7,9 +7,6 @@ on:
     - cron: '0 */3 * * *'
   workflow_dispatch: # 수동 실행 가능
 
-permissions:
-  contents: write
-
 jobs:
   run-script:
     runs-on: ubuntu-latest
@@ -43,7 +40,11 @@ jobs:
           if ls data/*.csv 1> /dev/null 2>&1; then
             git add data/*.csv
             git commit -m "Update data: $(date +'%Y-%m-%d %H:%M:%S')"
-            git push
+            
+            # 원격 저장소 변경 사항 가져오기 (충돌 방지)
+            git pull --rebase origin main
+            
+            git push origin main
           else
             echo "No data files found to commit."
           fi

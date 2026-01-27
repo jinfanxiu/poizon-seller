@@ -13,6 +13,9 @@ class BrandEnum(Enum):
     FILA = "휠라"
     ARCTERYX = "아크테릭스"
 
+# 타겟 브랜드 목록 (BrandEnum에서 자동 생성)
+TARGET_BRANDS = [b.value for b in BrandEnum]
+
 # 색상 매핑 테이블 (표준값: [동의어 리스트])
 COLOR_MAP = {
     "black": ["blk", "블랙", "검정", "noir", "nero", "coreblack", "black"],

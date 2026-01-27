@@ -19,17 +19,15 @@ GITHUB_REPO = "poizon-seller"
 WORKFLOW_FILE = "schedule.yml"
 GH_TOKEN = os.environ.get("GH_TOKEN")
 
-# 타겟 브랜드 목록 (utils/constants.py와 동기화 필요하지만, 여기선 하드코딩하거나 별도 로드)
+# 타겟 브랜드 목록
 TARGET_BRANDS = [
     "나이키", "아디다스", "데상트", "노스페이스", "코오롱스포츠", 
     "살로몬", "푸마", "뉴발란스", "수아레", "휠라", "아크테릭스"
 ]
 
-# 1. 비밀번호 인증 (세션 유지 기능 추가)
+# 1. 비밀번호 인증
 def check_password():
     """Returns `True` if the user had the correct password."""
-
-    # 환경 변수에서 비밀번호 가져오기
     correct_password = os.environ.get("PASSWORD")
     if not correct_password:
         try:
@@ -38,43 +36,31 @@ def check_password():
             correct_password = None
 
     if not correct_password:
-        st.error("비밀번호 설정이 되어있지 않습니다. (환경 변수 PASSWORD 또는 secrets.toml)")
+        st.error("비밀번호 설정이 되어있지 않습니다.")
         return False
 
-    # 비밀번호 해시 생성 (URL에 노출되므로 원본 대신 해시 사용)
     password_hash = hashlib.sha256(correct_password.encode()).hexdigest()
-
-    # URL 쿼리 파라미터 확인 (새로고침 시 유지용)
     query_params = st.query_params
     if "auth" in query_params and query_params["auth"] == password_hash:
         st.session_state["password_correct"] = True
         return True
 
     def password_entered():
-        """Checks whether a password entered by the user is correct."""
         if st.session_state["password"] == correct_password:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Don't store the password
-            # URL에 인증 토큰 추가
+            del st.session_state["password"]
             st.query_params["auth"] = password_hash
         else:
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        # First run, show input for password.
-        st.text_input(
-            "Password", type="password", on_change=password_entered, key="password"
-        )
+        st.text_input("Password", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
-        # Password not correct, show input + error.
-        st.text_input(
-            "Password", type="password", on_change=password_entered, key="password"
-        )
+        st.text_input("Password", type="password", on_change=password_entered, key="password")
         st.error("😕 Password incorrect")
         return False
     else:
-        # Password correct.
         return True
 
 if not check_password():
@@ -91,18 +77,25 @@ def get_workflow_status():
         "Authorization": f"Bearer {GH_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
     }
-    params = {
-        "status": "in_progress" # 실행 중인 것만 조회
-    }
-    
+    # in_progress 또는 queued 상태인 것 확인
+    params = {"status": "in_progress"}
     try:
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
             runs = response.json().get("workflow_runs", [])
-            # schedule.yml 워크플로우인지 확인
             for run in runs:
                 if run["path"].endswith(WORKFLOW_FILE):
                     return "running", run["html_url"]
+            
+            # queued 상태도 확인
+            params["status"] = "queued"
+            response = requests.get(url, headers=headers, params=params)
+            if response.status_code == 200:
+                runs = response.json().get("workflow_runs", [])
+                for run in runs:
+                    if run["path"].endswith(WORKFLOW_FILE):
+                        return "running", run["html_url"]
+            
             return "idle", None
         else:
             return "error", f"API Error: {response.status_code}"
@@ -123,12 +116,12 @@ def trigger_workflow(mode, brands=None, pages=None):
     inputs = {"mode": mode}
     if mode == "brand_search":
         if brands:
-            inputs["brands"] = ",".join(brands)
+            inputs["brands"] = brands # 단일 브랜드 문자열
         if pages:
             inputs["pages"] = pages
             
     data = {
-        "ref": "main", # 실행할 브랜치
+        "ref": "main",
         "inputs": inputs
     }
     
@@ -143,15 +136,12 @@ def trigger_workflow(mode, brands=None, pages=None):
 
 # 2. 데이터 로드 및 전처리
 def get_data_types():
-    """data 폴더 내의 서브 폴더 목록을 반환합니다."""
     data_dir = Path("data")
     if not data_dir.exists():
         return []
-    # 디렉토리만 필터링
     return [d.name for d in data_dir.iterdir() if d.is_dir()]
 
 def get_available_files(data_type):
-    """선택된 데이터 타입(폴더) 내의 CSV 파일 목록을 반환합니다."""
     data_dir = Path("data") / data_type
     if not data_dir.exists():
         return []
@@ -163,67 +153,73 @@ def load_data(data_type, filename):
     csv_path = f"data/{data_type}/{filename}"
     if not os.path.exists(csv_path):
         return None
-    
     df = pd.read_csv(csv_path)
-    
-    # 이미지 URL 보정
     if 'Image URL' in df.columns:
         df['Image URL'] = df['Image URL'].astype(str).str.replace('https:/images', 'https://image.msscdn.net/images', regex=False)
         df['Image URL'] = df['Image URL'].astype(str).str.replace('https://images', 'https://image.msscdn.net/images', regex=False)
-        
     return df
 
 st.title("👟 Poizon Seller Dashboard")
 
-# 상단 컨트롤 패널 (업데이트 버튼 등)
-with st.expander("🔄 Data Update Settings", expanded=True):
-    col_mode, col_opts, col_btn = st.columns([1, 2, 1])
-    
-    with col_mode:
-        update_mode = st.radio("Mode", ["Ranking", "Brand Search"])
+# --- 상단 컨트롤 패널 (UI 개선) ---
+st.markdown("### 🔄 Data Update")
+
+# 워크플로우 상태 확인 (캐싱하지 않고 매번 확인)
+wf_status, run_url = get_workflow_status()
+
+if wf_status == "running":
+    st.info(f"⚠️ 현재 데이터 업데이트가 진행 중입니다. 잠시만 기다려주세요. [진행 상황 보기]({run_url})")
+elif wf_status == "error":
+    st.error(f"GitHub API 상태 확인 실패: {run_url}")
+else:
+    # 실행 중이 아닐 때만 폼 표시
+    with st.container(border=True):
+        col1, col2, col3 = st.columns([1, 2, 1])
         
-    with col_opts:
-        if update_mode == "Brand Search":
-            selected_update_brands = st.multiselect("Target Brands", TARGET_BRANDS, default=["나이키"])
-            target_pages = st.text_input("Pages (e.g. 1 or 1-5)", value="1")
-        else:
-            st.info("Collects data from NEW, RISING, ALL rankings.")
+        with col1:
+            update_mode = st.radio("Mode", ["Ranking", "Brand Search"], key="mode_radio")
             
-    with col_btn:
-        st.write("") # Spacer
-        st.write("") # Spacer
-        # 워크플로우 상태 확인
-        status, run_url = get_workflow_status()
-        
-        if status == "running":
-            st.info("Running...")
-            if run_url:
-                st.markdown(f"[View Logs]({run_url})")
-        elif status == "error":
-            st.error("API Error")
-        else:
-            if st.button("Start Update", type="primary"):
-                if update_mode == "Brand Search" and not selected_update_brands:
-                    st.error("Please select at least one brand.")
+        with col2:
+            if update_mode == "Brand Search":
+                # 브랜드 단일 선택 (selectbox)
+                selected_brand = st.selectbox("Target Brand", TARGET_BRANDS, key="brand_select")
+                target_pages = st.text_input("Pages (e.g. 1 or 1-5)", value="1", key="page_input")
+            else:
+                st.markdown("<br><p style='color:gray'>Collects data from NEW, RISING, ALL rankings.</p>", unsafe_allow_html=True)
+                
+        with col3:
+            st.write("") # Spacer
+            st.write("") # Spacer
+            # 버튼 클릭 시 콜백 함수 없이 바로 로직 실행 (st.form 사용 안함 - 즉시 반응 위해)
+            # 중복 실행 방지를 위해 상태 확인 후 실행
+            if st.button("🚀 Start Update", type="primary", use_container_width=True):
+                # 더블 체크 (버튼 누르는 순간 다시 확인)
+                current_status, _ = get_workflow_status()
+                if current_status == "running":
+                    st.warning("이미 실행 중입니다!")
                 else:
                     mode_val = "brand_search" if update_mode == "Brand Search" else "ranking"
-                    success, msg = trigger_workflow(mode_val, selected_update_brands, target_pages if update_mode == "Brand Search" else None)
+                    brand_val = selected_brand if update_mode == "Brand Search" else None
+                    page_val = target_pages if update_mode == "Brand Search" else None
+                    
+                    with st.spinner("Requesting update..."):
+                        success, msg = trigger_workflow(mode_val, brand_val, page_val)
+                        
                     if success:
-                        st.success("Request sent!")
+                        st.success("✅ 요청 완료! (약 5분 소요)")
                         time.sleep(2)
                         st.rerun()
                     else:
-                        st.error(f"Failed: {msg}")
+                        st.error(f"❌ 요청 실패: {msg}")
 
 st.divider()
 
-# 데이터 선택 (폴더 -> 파일)
+# --- 데이터 조회 ---
 data_types = get_data_types()
 if not data_types:
     st.warning("아직 데이터가 수집되지 않았습니다.")
     st.stop()
 
-# 기본값 설정 (ranking 폴더가 있으면 우선 선택)
 default_type_idx = 0
 if "ranking" in data_types:
     default_type_idx = data_types.index("ranking")
@@ -247,21 +243,22 @@ if df is None:
     st.stop()
 
 last_updated = df['Updated At'].iloc[0] if 'Updated At' in df.columns else selected_file.replace(".csv", "")
-st.write(f"Data Loaded: {selected_type} / {selected_file} (Last Updated: {last_updated})")
+st.caption(f"Data Loaded: {selected_type} / {selected_file} (Last Updated: {last_updated})")
 
-# 3. 데이터 가공 (정렬 및 포맷팅)
 # 필터링 옵션
-st.sidebar.header("Filters")
-show_profit_only = st.sidebar.checkbox("Show Profit Items Only", value=False)
-selected_brands = st.sidebar.multiselect("Brand", df['Brand'].unique(), default=df['Brand'].unique())
-
-# Poizon Rank 필터
-if 'Poizon Rank' in df.columns:
-    all_ranks = sorted(df['Poizon Rank'].astype(str).unique())
-    selected_ranks = st.sidebar.multiselect("Poizon Rank", all_ranks, default=all_ranks)
+with st.expander("🔍 Filter Options", expanded=False):
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        show_profit_only = st.checkbox("Show Profit Items Only", value=False)
+    with col_f2:
+        selected_brands_filter = st.multiselect("Brand Filter", df['Brand'].unique(), default=df['Brand'].unique())
+    
+    if 'Poizon Rank' in df.columns:
+        all_ranks = sorted(df['Poizon Rank'].astype(str).unique())
+        selected_ranks = st.multiselect("Poizon Rank Filter", all_ranks, default=all_ranks)
 
 # 필터 적용
-filtered_df = df[df['Brand'].isin(selected_brands)]
+filtered_df = df[df['Brand'].isin(selected_brands_filter)]
 
 if show_profit_only:
     filtered_df = filtered_df[filtered_df['Status'] == 'PROFIT']
@@ -274,17 +271,8 @@ filtered_df = filtered_df.sort_values(by=['Has Profit', 'Profit', 'Model No', 'S
 
 # 컬럼 순서 및 이름 정리
 display_cols = [
-    "Status",
-    "Musinsa Price",
-    "Poizon Price",
-    "Profit",
-    "Size",
-    "Margin (%)",
-    "EU Size",
-    "Color",
-    "Poizon Stock",
-    "Musinsa URL",
-    # 내부 정렬용 컬럼들 (표시 안함)
+    "Status", "Musinsa Price", "Poizon Price", "Profit", "Size", "Margin (%)", 
+    "EU Size", "Color", "Poizon Stock", "Musinsa URL",
     "Brand", "Product Name", "Model No", "Image URL", "Poizon Score", "Poizon Rank"
 ]
 
@@ -308,7 +296,6 @@ def format_status(val):
         return "❌ LOSS"
     return val
 
-# 표시용 데이터프레임 생성
 display_df = filtered_df.copy()
 display_df['Musinsa Price'] = display_df['Musinsa Price'].apply(format_currency)
 display_df['Poizon Price'] = display_df['Poizon Price'].apply(format_currency)
@@ -316,19 +303,16 @@ display_df['Profit'] = display_df['Profit'].apply(format_currency)
 display_df['Margin (%)'] = display_df['Margin (%)'].apply(format_percent)
 display_df['Status'] = display_df['Status'].apply(format_status)
 
-# 4. 테이블 표시 (모델별 그룹화 효과)
+# 테이블 표시
 unique_models = filtered_df[['Model No', 'Has Profit', 'Profit']].drop_duplicates(subset=['Model No'])['Model No'].tolist()
 
 for model_no in unique_models:
     model_group = display_df[display_df['Model No'] == model_no]
     first_row = model_group.iloc[0]
     
-    # 헤더 (상품 정보)
     with st.expander(f"[{first_row['Brand']}] {first_row['Product Name']} ({model_no}) - {first_row['Poizon Rank']}", expanded=True):
-        # 이미지와 정보 표시
         col1, col2 = st.columns([1, 3])
         
-        # 원본 df에서 이미지 URL 가져오기
         img_url = filtered_df[filtered_df['Model No'] == model_no]['Image URL'].iloc[0]
         
         with col1:
@@ -336,12 +320,9 @@ for model_no in unique_models:
                 st.image(img_url, use_container_width=True)
             else:
                 st.text("No Image")
-            
-            # 모델 번호 복사 버튼
             st.code(model_no, language=None)
         
         with col2:
-            # 요청한 컬럼만 선택하여 표시
             cols_to_show = [
                 "Status", "Musinsa Price", "Poizon Price", "Profit", 
                 "Size", "Margin (%)", "EU Size", "Color", "Poizon Stock", "Musinsa URL"
@@ -354,9 +335,6 @@ for model_no in unique_models:
                 column_order=cols_to_show,
                 column_config={
                     "Musinsa URL": st.column_config.LinkColumn("Link"),
-                    "Status": st.column_config.TextColumn(
-                        "Status",
-                        help="Profit status"
-                    )
+                    "Status": st.column_config.TextColumn("Status", help="Profit status")
                 }
             )

@@ -25,6 +25,10 @@ TARGET_BRANDS = [
     "살로몬", "푸마", "뉴발란스", "수아레", "휠라", "아크테릭스"
 ]
 
+# 세션 상태 초기화
+if "is_updating" not in st.session_state:
+    st.session_state["is_updating"] = False
+
 # 1. 비밀번호 인증
 def check_password():
     """Returns `True` if the user had the correct password."""
@@ -167,6 +171,26 @@ st.markdown("### 🔄 Data Update")
 # 워크플로우 상태 확인 (캐싱하지 않고 매번 확인)
 wf_status, run_url = get_workflow_status()
 
+# 업데이트 요청 처리 (버튼 클릭 후 리런되었을 때 실행됨)
+if st.session_state["is_updating"]:
+    # 실제 API 호출
+    mode_val = st.session_state.get("update_mode_val")
+    brand_val = st.session_state.get("update_brand_val")
+    page_val = st.session_state.get("update_page_val")
+    
+    with st.spinner("Requesting update..."):
+        success, msg = trigger_workflow(mode_val, brand_val, page_val)
+    
+    if success:
+        st.success("✅ 요청 완료! (약 5분 소요)")
+    else:
+        st.error(f"❌ 요청 실패: {msg}")
+    
+    # 상태 초기화 및 리런
+    st.session_state["is_updating"] = False
+    time.sleep(2)
+    st.rerun()
+
 if wf_status == "running":
     st.info(f"⚠️ 현재 데이터 업데이트가 진행 중입니다. 잠시만 기다려주세요. [진행 상황 보기]({run_url})")
 elif wf_status == "error":
@@ -181,7 +205,6 @@ else:
             
         with col2:
             if update_mode == "Brand Search":
-                # 브랜드 단일 선택 (selectbox)
                 selected_brand = st.selectbox("Target Brand", TARGET_BRANDS, key="brand_select")
                 target_pages = st.text_input("Pages (e.g. 1 or 1-5)", value="1", key="page_input")
             else:
@@ -190,27 +213,14 @@ else:
         with col3:
             st.write("") # Spacer
             st.write("") # Spacer
-            # 버튼 클릭 시 콜백 함수 없이 바로 로직 실행 (st.form 사용 안함 - 즉시 반응 위해)
-            # 중복 실행 방지를 위해 상태 확인 후 실행
-            if st.button("🚀 Start Update", type="primary", use_container_width=True):
-                # 더블 체크 (버튼 누르는 순간 다시 확인)
-                current_status, _ = get_workflow_status()
-                if current_status == "running":
-                    st.warning("이미 실행 중입니다!")
-                else:
-                    mode_val = "brand_search" if update_mode == "Brand Search" else "ranking"
-                    brand_val = selected_brand if update_mode == "Brand Search" else None
-                    page_val = target_pages if update_mode == "Brand Search" else None
-                    
-                    with st.spinner("Requesting update..."):
-                        success, msg = trigger_workflow(mode_val, brand_val, page_val)
-                        
-                    if success:
-                        st.success("✅ 요청 완료! (약 5분 소요)")
-                        time.sleep(2)
-                        st.rerun()
-                    else:
-                        st.error(f"❌ 요청 실패: {msg}")
+            
+            # 버튼 클릭 시 상태만 변경하고 즉시 리런
+            if st.button("🚀 Start Update", type="primary", use_container_width=True, disabled=st.session_state["is_updating"]):
+                st.session_state["is_updating"] = True
+                st.session_state["update_mode_val"] = "brand_search" if update_mode == "Brand Search" else "ranking"
+                st.session_state["update_brand_val"] = selected_brand if update_mode == "Brand Search" else None
+                st.session_state["update_page_val"] = target_pages if update_mode == "Brand Search" else None
+                st.rerun()
 
 st.divider()
 

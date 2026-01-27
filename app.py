@@ -19,6 +19,12 @@ GITHUB_REPO = "poizon-seller"
 WORKFLOW_FILE = "schedule.yml"
 GH_TOKEN = os.environ.get("GH_TOKEN")
 
+# 타겟 브랜드 목록 (utils/constants.py와 동기화 필요하지만, 여기선 하드코딩하거나 별도 로드)
+TARGET_BRANDS = [
+    "나이키", "아디다스", "데상트", "노스페이스", "코오롱스포츠", 
+    "살로몬", "푸마", "뉴발란스", "수아레", "휠라", "아크테릭스"
+]
+
 # 1. 비밀번호 인증 (세션 유지 기능 추가)
 def check_password():
     """Returns `True` if the user had the correct password."""
@@ -103,7 +109,7 @@ def get_workflow_status():
     except Exception as e:
         return "error", str(e)
 
-def trigger_workflow():
+def trigger_workflow(mode, brands=None, pages=None):
     """워크플로우 실행을 요청합니다."""
     if not GH_TOKEN:
         return False, "GitHub Token not set"
@@ -113,8 +119,17 @@ def trigger_workflow():
         "Authorization": f"Bearer {GH_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
     }
+    
+    inputs = {"mode": mode}
+    if mode == "brand_search":
+        if brands:
+            inputs["brands"] = ",".join(brands)
+        if pages:
+            inputs["pages"] = pages
+            
     data = {
-        "ref": "main" # 실행할 브랜치
+        "ref": "main", # 실행할 브랜치
+        "inputs": inputs
     }
     
     try:
@@ -161,27 +176,46 @@ def load_data(data_type, filename):
 st.title("👟 Poizon Seller Dashboard")
 
 # 상단 컨트롤 패널 (업데이트 버튼 등)
-col_title, col_btn = st.columns([3, 1])
-
-with col_btn:
-    # 워크플로우 상태 확인
-    status, run_url = get_workflow_status()
+with st.expander("🔄 Data Update Settings", expanded=True):
+    col_mode, col_opts, col_btn = st.columns([1, 2, 1])
     
-    if status == "running":
-        st.info("🔄 업데이트 진행 중...")
-        if run_url:
-            st.markdown(f"[진행 상황 보기]({run_url})")
-    elif status == "error":
-        st.error("GitHub API 오류")
-    else:
-        if st.button("🔄 데이터 업데이트 요청"):
-            success, msg = trigger_workflow()
-            if success:
-                st.success("업데이트 요청 완료! (약 5분 소요)")
-                time.sleep(2)
-                st.rerun()
-            else:
-                st.error(f"요청 실패: {msg}")
+    with col_mode:
+        update_mode = st.radio("Mode", ["Ranking", "Brand Search"])
+        
+    with col_opts:
+        if update_mode == "Brand Search":
+            selected_update_brands = st.multiselect("Target Brands", TARGET_BRANDS, default=["나이키"])
+            target_pages = st.text_input("Pages (e.g. 1 or 1-5)", value="1")
+        else:
+            st.info("Collects data from NEW, RISING, ALL rankings.")
+            
+    with col_btn:
+        st.write("") # Spacer
+        st.write("") # Spacer
+        # 워크플로우 상태 확인
+        status, run_url = get_workflow_status()
+        
+        if status == "running":
+            st.info("Running...")
+            if run_url:
+                st.markdown(f"[View Logs]({run_url})")
+        elif status == "error":
+            st.error("API Error")
+        else:
+            if st.button("Start Update", type="primary"):
+                if update_mode == "Brand Search" and not selected_update_brands:
+                    st.error("Please select at least one brand.")
+                else:
+                    mode_val = "brand_search" if update_mode == "Brand Search" else "ranking"
+                    success, msg = trigger_workflow(mode_val, selected_update_brands, target_pages if update_mode == "Brand Search" else None)
+                    if success:
+                        st.success("Request sent!")
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error(f"Failed: {msg}")
+
+st.divider()
 
 # 데이터 선택 (폴더 -> 파일)
 data_types = get_data_types()
@@ -221,14 +255,9 @@ st.sidebar.header("Filters")
 show_profit_only = st.sidebar.checkbox("Show Profit Items Only", value=False)
 selected_brands = st.sidebar.multiselect("Brand", df['Brand'].unique(), default=df['Brand'].unique())
 
-# Poizon Rank 필터 추가
-# Rank 데이터에서 등급 문자(S, A, B, C, F)만 추출하여 유니크 값 생성
-# 예: "B (양호)" -> "B"
+# Poizon Rank 필터
 if 'Poizon Rank' in df.columns:
-    # 등급 추출 (첫 글자만 따거나, 괄호 앞부분)
-    # 데이터에 "N/A"도 있을 수 있음
     all_ranks = sorted(df['Poizon Rank'].astype(str).unique())
-    # 사용자에게 보여줄 옵션 (전체 문자열)
     selected_ranks = st.sidebar.multiselect("Poizon Rank", all_ranks, default=all_ranks)
 
 # 필터 적용

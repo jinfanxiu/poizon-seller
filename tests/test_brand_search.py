@@ -38,7 +38,7 @@ class TestBrandSearch(unittest.TestCase):
 
     def test_search_nike_products(self):
         target_brand = BrandEnum.DESCENTE
-        target_page = 2
+        target_page = 1
         
         # 파일명에 브랜드 추가 (YYYY-MM-DD_HH-MM-SS_BRAND.csv)
         timestamp = self.kst_now.strftime("%Y-%m-%d_%H-%M-%S")

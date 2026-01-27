@@ -127,16 +127,25 @@ def trigger_workflow():
         return False, str(e)
 
 # 2. 데이터 로드 및 전처리
-def get_available_dates():
+def get_data_types():
+    """data 폴더 내의 서브 폴더 목록을 반환합니다."""
     data_dir = Path("data")
+    if not data_dir.exists():
+        return []
+    # 디렉토리만 필터링
+    return [d.name for d in data_dir.iterdir() if d.is_dir()]
+
+def get_available_files(data_type):
+    """선택된 데이터 타입(폴더) 내의 CSV 파일 목록을 반환합니다."""
+    data_dir = Path("data") / data_type
     if not data_dir.exists():
         return []
     files = sorted(data_dir.glob("*.csv"), reverse=True)
     return [f.name for f in files]
 
 @st.cache_data(ttl=600)
-def load_data(filename):
-    csv_path = f"data/{filename}"
+def load_data(data_type, filename):
+    csv_path = f"data/{data_type}/{filename}"
     if not os.path.exists(csv_path):
         return None
     
@@ -174,21 +183,37 @@ with col_btn:
             else:
                 st.error(f"요청 실패: {msg}")
 
-# 날짜 선택
-available_files = get_available_dates()
-if not available_files:
+# 데이터 선택 (폴더 -> 파일)
+data_types = get_data_types()
+if not data_types:
     st.warning("아직 데이터가 수집되지 않았습니다.")
     st.stop()
 
-selected_file = st.selectbox("Select Data (Date & Time)", available_files)
-df = load_data(selected_file)
+# 기본값 설정 (ranking 폴더가 있으면 우선 선택)
+default_type_idx = 0
+if "ranking" in data_types:
+    default_type_idx = data_types.index("ranking")
+
+col_type, col_date = st.columns(2)
+
+with col_type:
+    selected_type = st.selectbox("Select Data Type", data_types, index=default_type_idx)
+
+with col_date:
+    available_files = get_available_files(selected_type)
+    if not available_files:
+        st.warning("해당 타입의 데이터 파일이 없습니다.")
+        st.stop()
+    selected_file = st.selectbox("Select Date & Time", available_files)
+
+df = load_data(selected_type, selected_file)
 
 if df is None:
     st.error("데이터를 불러올 수 없습니다.")
     st.stop()
 
 last_updated = df['Updated At'].iloc[0] if 'Updated At' in df.columns else selected_file.replace(".csv", "")
-st.write(f"Data Loaded: {selected_file} (Last Updated: {last_updated})")
+st.write(f"Data Loaded: {selected_type} / {selected_file} (Last Updated: {last_updated})")
 
 # 3. 데이터 가공 (정렬 및 포맷팅)
 # 필터링 옵션
@@ -196,11 +221,24 @@ st.sidebar.header("Filters")
 show_profit_only = st.sidebar.checkbox("Show Profit Items Only", value=False)
 selected_brands = st.sidebar.multiselect("Brand", df['Brand'].unique(), default=df['Brand'].unique())
 
+# Poizon Rank 필터 추가
+# Rank 데이터에서 등급 문자(S, A, B, C, F)만 추출하여 유니크 값 생성
+# 예: "B (양호)" -> "B"
+if 'Poizon Rank' in df.columns:
+    # 등급 추출 (첫 글자만 따거나, 괄호 앞부분)
+    # 데이터에 "N/A"도 있을 수 있음
+    all_ranks = sorted(df['Poizon Rank'].astype(str).unique())
+    # 사용자에게 보여줄 옵션 (전체 문자열)
+    selected_ranks = st.sidebar.multiselect("Poizon Rank", all_ranks, default=all_ranks)
+
 # 필터 적용
 filtered_df = df[df['Brand'].isin(selected_brands)]
 
 if show_profit_only:
     filtered_df = filtered_df[filtered_df['Status'] == 'PROFIT']
+
+if 'Poizon Rank' in df.columns and selected_ranks:
+    filtered_df = filtered_df[filtered_df['Poizon Rank'].isin(selected_ranks)]
 
 # 데이터프레임 정렬
 filtered_df = filtered_df.sort_values(by=['Has Profit', 'Profit', 'Model No', 'Size'], ascending=[False, False, True, True])

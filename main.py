@@ -8,7 +8,7 @@ import config
 from sellers.musinsa import MusinsaSeller, MusinsaRankingType
 from sellers.poizon import PoizonSeller
 from utils.comparator import ProductComparator
-from utils.constants import TARGET_BRANDS
+from utils.constants import BrandEnum
 
 
 def get_kst_now():
@@ -32,7 +32,7 @@ def cleanup_old_files(directory: Path, keep_count: int = 5):
     
     if len(files) > keep_count:
         files_to_delete = files[:-keep_count]
-        print(f"\n[Cleanup] Found {len(files)} files. Deleting {len(files_to_delete)} old files...")
+        print(f"\n[Cleanup] Found {len(files)} files in {directory}. Deleting {len(files_to_delete)} old files...")
         
         for file in files_to_delete:
             try:
@@ -41,7 +41,7 @@ def cleanup_old_files(directory: Path, keep_count: int = 5):
             except Exception as e:
                 print(f"  - Failed to delete {file.name}: {e}")
     else:
-        print(f"\n[Cleanup] File count ({len(files)}) is within limit ({keep_count}). No deletion needed.")
+        print(f"\n[Cleanup] File count ({len(files)}) in {directory} is within limit ({keep_count}). No deletion needed.")
 
 
 def main():
@@ -61,15 +61,16 @@ def main():
     poizon_seller = PoizonSeller(dutoken=dutoken, cookie=cookie)
     comparator = ProductComparator(musinsa_seller, poizon_seller)
 
-    # 결과 저장 경로 설정 (날짜_시간 파일)
-    output_dir = Path("data")
-    output_dir.mkdir(exist_ok=True)
+    # 결과 저장 경로 설정 (data/ranking/날짜_시간.csv)
+    output_dir = Path("data/ranking")
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     # 파일명에 한국 시간 적용 (YYYY-MM-DD_HH-MM-SS.csv)
     timestamp = kst_now.strftime("%Y-%m-%d_%H-%M-%S")
     output_file = output_dir / f"{timestamp}.csv"
 
     # 2. 랭킹 수집 (중복 제거)
+    target_brands = [b.value for b in BrandEnum]
     ranking_types = [
         MusinsaRankingType.NEW,
         MusinsaRankingType.RISING,
@@ -78,10 +79,10 @@ def main():
     
     unique_products = {}  # product_id -> item
     
-    print(f"Fetching rankings for {TARGET_BRANDS}...")
+    print(f"Fetching rankings for {target_brands}...")
     for r_type in ranking_types:
         print(f"  - Fetching {r_type.name} ranking...")
-        rankings = musinsa_seller.fetch_ranking(r_type, brand_names=TARGET_BRANDS)
+        rankings = musinsa_seller.fetch_ranking(r_type, brand_names=target_brands)
         if rankings:
             for item in rankings:
                 if item.product_id not in unique_products:

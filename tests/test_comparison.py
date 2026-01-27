@@ -21,7 +21,7 @@ class TestProductComparison(unittest.TestCase):
         
         self.comparator = ProductComparator(self.musinsa_seller, self.poizon_seller)
         # 테스트 키워드 변경 (색상별 비교가 필요한 모델)
-        self.test_keyword = "KE5659"
+        self.test_keyword = "SQ313RPD91"
 
     def test_compare_product(self):
         print(f"\n[Test] Comparing products for {self.test_keyword}...")

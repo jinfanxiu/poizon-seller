@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from models.product import ProductInfo, ProductOption, SalesMetrics
 from sellers.base import BaseSeller
 from utils.matching import find_best_match, normalize_text
+from utils.constants import BrandEnum
 
 
 class MusinsaRankingType(Enum):
@@ -31,6 +32,41 @@ class MusinsaSeller(BaseSeller):
         super().__init__("Musinsa")
         # 랭킹 섹션 데이터를 가져오는 API URL 템플릿
         self.ranking_section_url = "https://api.musinsa.com/api2/hm/web/v5/pans/ranking?storeCode=musinsa&sectionId={section_id}&contentsId=&categoryCode=000&subPan=product&gf=A&ageBand=AGE_BAND_ALL"
+
+    def search_by_brand(self, brand: BrandEnum, page: int = 1) -> list[ProductInfo]:
+        """
+        브랜드 키워드로 상품을 검색하고, 검색된 모든 상품의 상세 정보를 리스트로 반환합니다.
+        페이지네이션을 지원합니다.
+        """
+        keyword = brand.value
+        try:
+            # 1. 검색 API 호출
+            search_results = self._call_search_api(keyword, page=page)
+            if not search_results:
+                print(f"No search results found for brand: {keyword} (page {page})")
+                return []
+
+            print(f"Search API returned {len(search_results)} items for brand: {keyword} (page {page})")
+
+            # 2. 검색된 모든 상품 ID 수집
+            product_ids = []
+            for item in search_results:
+                product_id = str(item.get("goodsNo"))
+                if product_id:
+                    product_ids.append(product_id)
+
+            # 3. 모든 상품의 상세 정보 조회
+            product_infos = []
+            for pid in product_ids:
+                p_info = self.get_product_info(pid)
+                if p_info:
+                    product_infos.append(p_info)
+
+            return product_infos
+
+        except Exception as e:
+            print(f"Error in search_by_brand: {e}")
+            return []
 
     def search_product(self, keyword: str) -> list[ProductInfo]:
         """
@@ -113,7 +149,7 @@ class MusinsaSeller(BaseSeller):
                 return candidate
         return None
 
-    def _call_search_api(self, keyword: str) -> list[dict[str, Any]]:
+    def _call_search_api(self, keyword: str, page: int = 1) -> list[dict[str, Any]]:
         """무신사 검색 API를 호출합니다."""
         url = "https://api.musinsa.com/api2/dp/v1/plp/goods"
         params = {
@@ -121,7 +157,7 @@ class MusinsaSeller(BaseSeller):
             "keyword": keyword,
             "sortCode": "POPULAR",
             "isUsed": "false",
-            "page": "1",
+            "page": str(page),
             "size": "60",
             "testGroup": "",
             "seen": "0",
@@ -242,26 +278,10 @@ class MusinsaSeller(BaseSeller):
             goods_nm = meta_data.get("goodsNm", "")
             style_no = meta_data.get("styleNo", "") # 스타일 번호 추출
             goods_images = meta_data.get("goodsImages", [])
+            image_url = (
+                f"https:{goods_images[0]['imageUrl']}" if goods_images else ""
+            )
             
-            # 이미지 URL 수정: https: 추가
-            image_url = ""
-            if goods_images:
-                raw_url = goods_images[0]['imageUrl']
-                if raw_url.startswith("//"):
-                    image_url = f"https:{raw_url}"
-                elif raw_url.startswith("/"):
-                    image_url = f"https:{raw_url}" # 이미 /가 있으므로 https:만 붙임 (주의: //가 아닐 경우)
-                    # 하지만 보통 //image... 형태이거나 /images... 형태임
-                    # /images... 형태라면 도메인이 필요할 수 있음 (musinsa.com)
-                    # 일단 기존 로직에서 슬래시가 하나 부족했던 것 같으므로 https://를 붙여봄
-                    if not raw_url.startswith("//"):
-                         image_url = f"https:/{raw_url}" # 기존 로직이 이거였음 -> https:/images...
-                         # 올바른 형태: https://image.msscdn.net... 또는 https://www.musinsa.com...
-                         # 만약 도메인 없는 상대 경로라면:
-                         image_url = f"https://image.msscdn.net{raw_url}" # 도메인 가정
-                else:
-                    image_url = raw_url
-
             # goodsPrice가 None일 수 있으므로 안전하게 처리
             goods_price = meta_data.get("goodsPrice") or {}
             

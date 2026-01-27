@@ -8,7 +8,7 @@ import config
 from sellers.musinsa import MusinsaSeller, MusinsaRankingType
 from sellers.poizon import PoizonSeller
 from utils.comparator import ProductComparator
-from utils.constants import TARGET_BRANDS
+from utils.constants import BrandEnum
 
 
 class TestAllRankingsComparison(unittest.TestCase):
@@ -32,6 +32,7 @@ class TestAllRankingsComparison(unittest.TestCase):
         self.output_file = self.output_dir / f"all_rankings_comparison_result_{timestamp}.csv"
 
     def test_compare_all_rankings(self):
+        target_brands = [b.value for b in BrandEnum]
         ranking_types = [
             MusinsaRankingType.NEW,
             MusinsaRankingType.RISING,
@@ -41,12 +42,12 @@ class TestAllRankingsComparison(unittest.TestCase):
         # 1. 모든 랭킹 수집 및 중복 제거
         unique_products = {}  # product_id -> item
         
-        print(f"\n[Step 1] Fetching rankings for {TARGET_BRANDS}...")
+        print(f"\n[Step 1] Fetching rankings for {target_brands}...")
         
         for r_type in ranking_types:
             print(f"  - Fetching {r_type.name} ranking...")
             rankings = self.musinsa_seller.fetch_ranking(
-                r_type, brand_names=TARGET_BRANDS
+                r_type, brand_names=target_brands
             )
             
             if rankings:

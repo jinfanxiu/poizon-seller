@@ -1,5 +1,17 @@
-# 타겟 브랜드 목록 (한 곳에서 관리)
-TARGET_BRANDS = ["나이키", "아디다스", "데상트", "노스페이스", "코오롱스포츠", "살로몬", "푸마", "뉴발란스", "수아레", "휠라", "아크테릭스"]
+from enum import Enum
+
+class BrandEnum(Enum):
+    NIKE = "나이키"
+    ADIDAS = "아디다스"
+    DESCENTE = "데상트"
+    NORTHFACE = "노스페이스"
+    KOLONSPORT = "코오롱스포츠"
+    SALOMON = "살로몬"
+    PUMA = "푸마"
+    NEWBALANCE = "뉴발란스"
+    SUARE = "수아레"
+    FILA = "휠라"
+    ARCTERYX = "아크테릭스"
 
 # 색상 매핑 테이블 (표준값: [동의어 리스트])
 COLOR_MAP = {

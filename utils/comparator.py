@@ -12,15 +12,56 @@ class ProductComparator:
         self.musinsa = musinsa_seller
         self.poizon = poizon_seller
 
+    def _normalize_color(self, color: str) -> str:
+        """
+        색상 문자열을 정규화합니다.
+        """
+        if not color or color.upper() == "ONE COLOR":
+            return "onecolor"
+        
+        # 1. 전처리: 소문자 변환
+        norm_color = color.lower()
+        
+        # 2. 무신사 패턴 처리 (예: BLK0_BLACK -> black, BGBK_BEIGE-BLACK -> beige-black)
+        if "_" in norm_color:
+            parts = norm_color.split("_")
+            norm_color = parts[-1]
+
+        # 3. 특수문자 제거 및 공백 처리
+        clean_color = re.sub(r"[^a-z]", "", norm_color)
+        
+        # 4. 매핑 테이블 조회
+        from utils.constants import COLOR_MAP
+        
+        for standard, synonyms in COLOR_MAP.items():
+            for syn in synonyms:
+                if syn in clean_color:
+                    return standard
+        
+        return clean_color
+
     def compare_product(self, keyword: str) -> ProductComparisonResult | None:
         """
         키워드(모델 번호)로 무신사와 Poizon 상품을 검색하고 가격을 비교합니다.
+        입력된 키워드가 복합 모델 번호(예: SQ313RPD91_BLK0)인 경우, 
+        기본 모델 번호(SQ313RPD91)로 변환하여 검색을 시도합니다.
         """
-        print(f"[Comparator] Comparing for keyword: {keyword}")
+        search_keyword = keyword
+        
+        # 모델 번호 정제 (예: SQ313RPD91_BLK0 -> SQ313RPD91)
+        # 데상트 등 일부 브랜드는 모델 번호 뒤에 색상 코드가 붙음
+        if "_" in keyword:
+            parts = keyword.split("_")
+            # 앞부분이 모델 번호일 가능성이 높음 (단, 너무 짧으면 제외)
+            if len(parts[0]) > 3:
+                search_keyword = parts[0]
+                print(f"[Comparator] Refined keyword: {keyword} -> {search_keyword}")
+
+        print(f"[Comparator] Comparing for keyword: {search_keyword}")
 
         # 1. Fetch Data
-        musinsa_infos = self.musinsa.search_product(keyword)
-        poizon_info = self.poizon.get_product_info(keyword)
+        musinsa_infos = self.musinsa.search_product(search_keyword)
+        poizon_info = self.poizon.get_product_info(search_keyword)
 
         if not musinsa_infos or not poizon_info:
             print("[Comparator] Failed to fetch product info from one or both platforms.")
@@ -39,10 +80,8 @@ class ProductComparator:
         for info in musinsa_infos:
             for opt in info.options:
                 norm_size = DataNormalizer.normalize_size(opt.size)
-                norm_color = DataNormalizer.normalize_color(opt.color)
+                norm_color = self._normalize_color(opt.color)
                 key = (norm_size, norm_color)
-                
-                # print(f"Musinsa Key: {key} (Original: {opt.size}, {opt.color})") # Debug
                 
                 if key not in musinsa_map:
                     musinsa_map[key] = opt
@@ -60,10 +99,8 @@ class ProductComparator:
         poizon_map = {}
         for opt in poizon_info.options:
             norm_size = DataNormalizer.normalize_size(opt.size)
-            norm_color = DataNormalizer.normalize_color(opt.color)
+            norm_color = self._normalize_color(opt.color)
             key = (norm_size, norm_color)
-            
-            # print(f"Poizon Key: {key} (Original: {opt.size}, {opt.color})") # Debug
             
             if key not in poizon_map:
                 poizon_map[key] = opt

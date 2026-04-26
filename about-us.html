@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>회사소개 | 통하는 차이나 (华潮通)</title>
+    <meta name="description" content="신뢰할 수 있는 한중 비즈니스 파트너, 통하는 차이나 회사소개">
+
+    <link href="https://lib.baomitu.com/remixicon/4.2.0/remixicon.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { DEFAULT: '#10B981', dark: '#059669', light: '#D1FAE5' },
+                        accent: { DEFAULT: '#F59E0B', light: '#FEF3C7' },
+                        ink: { DEFAULT: '#0A0A0A', light: '#262626' },
+                        kol: { DEFAULT: '#EA580C', light: '#FFEDD5' }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style type="text/tailwindcss">
+        @layer base {
+            html { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; }
+            body { @apply antialiased text-slate-600 bg-slate-50; }
+        }
+        @layer components {
+            .glass-header { @apply fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/50; }
+            .vision-card { @apply w-full bg-white border-2 border-slate-100 rounded-3xl p-6 shadow-sm transform transition-transform active:scale-95; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pt-16">
+
+    <header class="glass-header h-16 flex items-center justify-between px-5">
+        <a href="javascript:history.back()" class="w-8 h-8 flex items-center justify-center text-ink rounded-full bg-slate-100 active:bg-slate-200 transition-colors">
+            <i class="ri-arrow-left-line text-lg"></i>
+        </a>
+        <div class="flex items-center gap-1.5">
+            <span class="font-black text-lg tracking-tighter text-ink">회사소개</span>
+        </div>
+        <div class="w-8 h-8"></div>
+    </header>
+
+    <main class="flex-1 px-5 pb-12">
+
+        <section class="pt-10 pb-8 text-center space-y-4">
+            <div class="inline-flex items-center gap-1.5 bg-ink/5 border border-ink/10 px-4 py-2 rounded-full mb-2">
+                <i class="ri-building-4-fill text-ink text-sm"></i>
+                <p class="text-[11px] font-bold text-ink">About Us</p>
+            </div>
+
+            <h1 class="text-3xl font-black text-ink leading-[1.25] tracking-tighter">
+                중국 마케팅의 높은 문턱,<br>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">우리가 허물겠습니다</span>
+            </h1>
+
+            <p class="text-[13px] font-bold text-slate-500 max-w-xs mx-auto leading-relaxed pt-2">
+                비싼 대행사 비용, 소통의 어려움.<br>
+                사장님들의 답답했던 고충을 해결하기 위해<br>통하는 차이나가 시작되었습니다.
+            </p>
+        </section>
+
+        <section class="grid grid-cols-3 gap-3 mb-10">
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 text-center shadow-sm flex flex-col items-center justify-center">
+                <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-2">
+                    <i class="ri-money-dollar-circle-line text-lg"></i>
+                </div>
+                <div class="text-[11px] font-black text-slate-700 leading-tight">거품 없는<br>비용</div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 text-center shadow-sm flex flex-col items-center justify-center">
+                <div class="w-8 h-8 rounded-full bg-accent/10 text-accent flex items-center justify-center mb-2">
+                    <i class="ri-hand-heart-line text-lg"></i>
+                </div>
+                <div class="text-[11px] font-black text-slate-700 leading-tight">대행사 없는<br>다이렉트</div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 text-center shadow-sm flex flex-col items-center justify-center">
+                <div class="w-8 h-8 rounded-full bg-ink/5 text-ink flex items-center justify-center mb-2">
+                    <i class="ri-user-star-line text-lg"></i>
+                </div>
+                <div class="text-[11px] font-black text-slate-700 leading-tight">진짜 고객과<br>직접 연결</div>
+            </div>
+        </section>
+
+        <section class="space-y-4 mb-10">
+            <h2 class="text-sm font-black text-ink mb-4 px-2">우리가 사장님께 드리는 3가지 약속</h2>
+
+            <div class="vision-card border-l-[6px] border-l-primary">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <i class="ri-scissors-cut-line text-primary text-lg"></i>
+                    </div>
+                    <h3 class="text-[15px] font-black text-ink">더 이상 대행사에 끌려다니지 마세요</h3>
+                </div>
+                <p class="text-[12px] font-bold text-slate-500 leading-relaxed">
+                    불투명한 수수료와 복잡한 계약 구조를 과감히 잘라냈습니다. 사장님이 직접 통제하고 확인하는 투명한 시스템으로 합리적인 마케팅을 지원합니다.
+                </p>
+            </div>
+
+            <div class="vision-card border-l-[6px] border-l-accent">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
+                        <i class="ri-flight-takeoff-line text-accent text-lg"></i>
+                    </div>
+                    <h3 class="text-[15px] font-black text-ink">한국을 찾는 '진짜' 고객과 연결합니다</h3>
+                </div>
+                <p class="text-[12px] font-bold text-slate-500 leading-relaxed">
+                    의미 없는 조회수 늘리기용 마케팅이 아닙니다. 우리 매장에 실제로 방문할 수 있는 방한 중국인 MZ 세대를 우리 매장의 앰버서더로 만들어 드립니다.
+                </p>
+            </div>
+
+            <div class="vision-card border-l-[6px] border-l-ink">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-full bg-ink/5 flex items-center justify-center shrink-0">
+                        <i class="ri-translate text-ink text-lg"></i>
+                    </div>
+                    <h3 class="text-[15px] font-black text-ink">중국어를 몰라도, 마케팅을 몰라도</h3>
+                </div>
+                <p class="text-[12px] font-bold text-slate-500 leading-relaxed">
+                    플랫폼 가입부터 캠페인 진행, 리뷰 확인까지 모든 과정이 한국어로 쉽고 직관적으로 설계되었습니다. 사장님은 매장 운영에만 집중하세요.
+                </p>
+            </div>
+        </section>
+
+        <section class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <h2 class="text-sm font-black text-ink mb-5 text-center">기업 정보</h2>
+            <ul class="space-y-4">
+                <li class="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <span class="text-[12px] font-bold text-slate-400">서비스명</span>
+                    <span class="text-[13px] font-black text-ink">통하는 차이나 (华潮通)</span>
+                </li>
+                <li class="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <span class="text-[12px] font-bold text-slate-400">비전</span>
+                    <span class="text-[13px] font-bold text-slate-700">로컬 매장의 가장 쉬운 글로벌 확장</span>
+                </li>
+                <li class="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <span class="text-[12px] font-bold text-slate-400">제휴 문의</span>
+                    <span class="text-[13px] font-bold text-slate-700">partner@t-china.com</span>
+                </li>
+                <li class="flex flex-col gap-1 pt-1">
+                    <span class="text-[12px] font-bold text-slate-400">우리의 다짐</span>
+                    <span class="text-[13px] font-bold text-slate-700 leading-relaxed">
+                        "가장 복잡한 시장을, 가장 단순한 방법으로 연결합니다."
+                    </span>
+                </li>
+            </ul>
+        </section>
+
+        <div class="mt-8">
+            <a href="/owner/intro" class="flex justify-center items-center gap-2 w-full py-4 bg-primary text-white hover:bg-primary-dark transition-colors rounded-xl font-black shadow-lg shadow-primary/20">
+                <i class="ri-rocket-2-fill text-lg"></i> 통하는 차이나 시작하기
+            </a>
+        </div>
+
+    </main>
+
+    <footer class="text-center py-8 bg-slate-100 border-t border-slate-200 px-5">
+        <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
+            © 2026 华潮通 (Huácháo tōng)<br>
+            Easy & Direct Marketing Platform
+        </p>
+    </footer>
+
+</body>
+</html>

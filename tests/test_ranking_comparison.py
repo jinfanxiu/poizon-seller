@@ -1,6 +1,7 @@
 import csv
 import time
 import unittest
+import pytest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -16,6 +17,9 @@ def get_kst_now():
     utc_now = datetime.now(timezone.utc)
     kst_now = utc_now + timedelta(hours=9)
     return kst_now
+
+
+pytestmark = pytest.mark.e2e
 
 
 class TestRankingComparison(unittest.TestCase):

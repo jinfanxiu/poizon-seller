@@ -1,6 +1,7 @@
 import csv
 import time
 import unittest
+import pytest
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
@@ -16,6 +17,9 @@ def get_kst_now():
     utc_now = datetime.now(timezone.utc)
     kst_now = utc_now + timedelta(hours=9)
     return kst_now
+
+
+pytestmark = pytest.mark.e2e
 
 
 class TestBrandSearch(unittest.TestCase):
@@ -125,4 +129,19 @@ class TestBrandSearch(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    # `uv run python tests/test_brand_search.py` (기본: 데상트 1p)
+    # `uv run python tests/test_brand_search.py 푸마 -p 1` 는 run_brand_search CLI와 동일
+    import os
+    import sys
+    from pathlib import Path
+
+    _root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(_root))
+    os.chdir(_root)
+    import run_brand_search
+
+    if len(sys.argv) == 1:
+        run_brand_search.run_brand_search("데상트", "1")
+    else:
+        sys.argv[0] = "run_brand_search.py"
+        run_brand_search.cli()

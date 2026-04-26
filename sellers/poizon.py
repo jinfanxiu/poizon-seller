@@ -57,8 +57,15 @@ class SalesVelocity(BaseModel):
 class PoizonSeller(BaseSeller):
     SALT: str = "048a9c4943398714b356a696503d2d36"
 
-    def __init__(self, dutoken: str | None = None, cookie: str | None = None) -> None:
+    def __init__(
+        self,
+        dutoken: str | None = None,
+        cookie: str | None = None,
+        shumeiid: str | None = None,
+        referer: str | None = None,
+    ) -> None:
         super().__init__(name="POIZON")
+        self.last_api_error: str | None = None
         # 인자로 전달받지 않으면 config에서 가져옴
         raw_dutoken = dutoken or config.POIZON_DUTOKEN
         raw_cookie = cookie or config.POIZON_COOKIE
@@ -66,9 +73,28 @@ class PoizonSeller(BaseSeller):
         # 공백 및 줄바꿈 제거 (GitHub Secrets 오류 방지)
         self.dutoken: str = raw_dutoken.strip() if raw_dutoken else ""
         self.cookie: str = raw_cookie.strip() if raw_cookie else ""
-
+        # 브라우저는 Cookie 외에 동일 값을 "sk" 헤더에도 보냄(직접 전달). 없으면 쿠키에서 추출
+        m_sk = re.search(r"(?:^|;)\s*sk=([^;]+)", self.cookie)
+        self._sk_from_cookie: str = m_sk.group(1).strip() if m_sk else ""
+        if shumeiid is not None:
+            self._shumeiid: str = shumeiid.strip()
+        else:
+            self._shumeiid = (config.POIZON_SHUMEIID or "").strip()
+        _ref = (
+            (referer or config.POIZON_REFERER or "https://seller.poizon.com/main/goods/search")
+            or "https://seller.poizon.com/main/goods/search"
+        ).strip()
         if not self.dutoken or not self.cookie:
             print("[Warning] Poizon dutoken or cookie is missing. API calls may fail.")
+        if not self._shumeiid and shumeiid is None:
+            print(
+                "[Warning] POIZON_SHUMEIID is empty. If API returns 401 (passport), copy "
+                "'shumeiid' from a working merchant/search request in DevTools → .env"
+            )
+        if not self._sk_from_cookie:
+            print(
+                "[Warning] Cookie has no 'sk=…'. Poizon may need sk as header; use full Cookie from browser."
+            )
 
         self.base_headers: dict[str, str] = {
             'accept': 'application/json',
@@ -76,11 +102,14 @@ class PoizonSeller(BaseSeller):
             'channel': 'pc',
             'clientid': 'global',
             'content-type': 'application/json;charset=UTF-8',
+            'lang': 'ko',
             'language': 'ko',
             'origin': 'https://seller.poizon.com',
             'priority': 'u=1, i',
-            'referer': 'https://seller.poizon.com/',
-            'sec-ch-ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
+            'referer': _ref,
+            'sec-ch-ua': (
+                '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"'
+            ),
             'sec-ch-ua-mobile': '?0',
             'sec-ch-ua-platform': '"macOS"',
             'sec-fetch-dest': 'empty',
@@ -88,13 +117,20 @@ class PoizonSeller(BaseSeller):
             'sec-fetch-site': 'same-origin',
             'syscode': 'DU_USER_GLOBAL',
             'timezone': 'GMT+09:00',
-            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
+            'user-agent': (
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+            ),
         }
 
     def _get_headers(self) -> dict[str, str]:
         headers = self.base_headers.copy()
         headers['dutoken'] = self.dutoken
         headers['Cookie'] = self.cookie
+        if self._sk_from_cookie:
+            headers['sk'] = self._sk_from_cookie
+        if self._shumeiid:
+            headers['shumeiid'] = self._shumeiid
         return headers
 
     def _generate_sign(self, payload_dict: dict[str, Any]) -> str:
@@ -129,11 +165,31 @@ class PoizonSeller(BaseSeller):
         payload_json = json.dumps(payload_dict, separators=(',', ':'))
 
         try:
-            response = requests.post(final_url, headers=self._get_headers(), data=payload_json)
-            response.raise_for_status()
+            response = requests.post(
+                final_url, headers=self._get_headers(), data=payload_json, timeout=60
+            )
+            try:
+                data = response.json()
+            except ValueError:
+                data = {}
+
+            if not response.ok:
+                msg = data.get("msg") if isinstance(data, dict) else None
+                err_detail = f" {msg}" if msg else f" (body: {response.text[:300]!r})"
+                self.last_api_error = (
+                    f"poizon request failed: {response.status_code} {response.reason} "
+                    f"for {url}{err_detail}"
+                )
+                print(
+                    f"Error sending request: {response.status_code} {response.reason} for {url}{err_detail}"
+                )
+                # 비-2xx여도 code/msg가 있으면 하위에서 처리 (401 passport 만료 등)
+                return data if isinstance(data, dict) else {}
+
             time.sleep(2)
-            return response.json()
+            return data
         except requests.exceptions.RequestException as e:
+            self.last_api_error = f"poizon request exception for {url}: {e}"
             print(f"Error sending request: {e}")
             return {}
 
@@ -402,6 +458,7 @@ class PoizonSeller(BaseSeller):
         print(f"[Info] '{model_number}' 검색 시작...")
         search_res = self.search_product(model_number)
         if search_res.get('code') != 200:
+            self.last_api_error = f"poizon search api error: {search_res.get('msg') or search_res.get('code')}"
             print(f"[Error] 검색 API 오류: {search_res.get('msg')}")
             return None
 

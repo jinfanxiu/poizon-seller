@@ -1,6 +1,7 @@
 import csv
 import time
 import unittest
+import pytest
 from datetime import datetime
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from sellers.musinsa import MusinsaSeller, MusinsaRankingType
 from sellers.poizon import PoizonSeller
 from utils.comparator import ProductComparator
 from utils.constants import BrandEnum
+
+pytestmark = pytest.mark.e2e
 
 
 class TestAllRankingsComparison(unittest.TestCase):

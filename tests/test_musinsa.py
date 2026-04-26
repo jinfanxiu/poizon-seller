@@ -1,7 +1,10 @@
+import pytest
 import unittest
 from sellers.musinsa import MusinsaSeller, MusinsaRankingType
 from utils.matching import normalize_text
 from utils.constants import BrandEnum
+
+pytestmark = pytest.mark.e2e
 
 
 class TestMusinsaSeller(unittest.TestCase):

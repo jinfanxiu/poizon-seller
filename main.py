@@ -18,7 +18,7 @@ def get_kst_now():
     return kst_now
 
 
-def cleanup_old_files(directory: Path, keep_count: int = 5):
+def cleanup_old_files(directory: Path, keep_count: int = 25):
     """
     지정된 디렉토리에서 오래된 CSV 파일을 삭제하여 최신 파일만 남깁니다.
     """
@@ -73,7 +73,7 @@ def run_ranking_collection(musinsa_seller, comparator, output_dir, kst_now):
     output_file = output_dir / f"{timestamp}.csv"
     
     process_and_save(list(unique_products.values()), musinsa_seller, comparator, output_file, kst_now)
-    cleanup_old_files(output_dir, keep_count=5)
+    cleanup_old_files(output_dir, keep_count=25)
 
 
 def run_brand_search_collection(musinsa_seller, comparator, output_dir, kst_now):
@@ -81,6 +81,7 @@ def run_brand_search_collection(musinsa_seller, comparator, output_dir, kst_now)
     # 환경 변수에서 옵션 가져오기
     brands_str = os.environ.get("TARGET_BRANDS", "")
     pages_str = os.environ.get("TARGET_PAGES", "1")
+    fail_fast = (os.environ.get("FAIL_FAST_ON_API_ERROR", "1") or "1").strip().lower() in {"1", "true", "yes", "y"}
     
     if not brands_str:
         print("[Error] No brands specified for brand_search mode.")
@@ -97,8 +98,15 @@ def run_brand_search_collection(musinsa_seller, comparator, output_dir, kst_now)
         target_pages = [int(p) for p in pages_str.split(",") if p.strip().isdigit()]
 
     print(f"Starting brand search for {target_brands} on pages {target_pages}...")
+    print(f"[Config] fail_fast_on_api_error={fail_fast}")
+    total_brands = len(target_brands)
+    total_pages = len(target_pages)
     
-    for brand_name in target_brands:
+    for brand_idx, brand_name in enumerate(target_brands, start=1):
+        print(
+            f"\n[Brand {brand_idx}/{total_brands}] {brand_name} "
+            f"(pages: {total_pages}, target={target_pages})"
+        )
         # BrandEnum에서 해당 브랜드 찾기
         try:
             brand_enum = next(b for b in BrandEnum if b.value == brand_name)
@@ -107,17 +115,26 @@ def run_brand_search_collection(musinsa_seller, comparator, output_dir, kst_now)
             continue
             
         all_products = []
-        for page in target_pages:
-            print(f"  - Searching {brand_name} (Page {page})...")
+        for page_idx, page in enumerate(target_pages, start=1):
+            print(
+                f"  [Page {page_idx}/{total_pages}] Searching {brand_name} (page={page})..."
+            )
             products = musinsa_seller.search_by_brand(brand_enum, page=page)
             all_products.extend(products)
+            print(
+                f"    -> page result: {len(products)} items "
+                f"(accumulated: {len(all_products)})"
+            )
             time.sleep(1)
             
         if not all_products:
             print(f"  -> No products found for {brand_name}.")
             continue
             
-        print(f"  -> Found {len(all_products)} products for {brand_name}. Starting comparison...")
+        print(
+            f"  -> Found {len(all_products)} products for {brand_name}. "
+            f"Starting comparison..."
+        )
         
         # 브랜드별로 파일 저장
         timestamp = kst_now.strftime("%Y-%m-%d_%H-%M-%S")
@@ -127,13 +144,32 @@ def run_brand_search_collection(musinsa_seller, comparator, output_dir, kst_now)
         # process_and_save는 RankingItem 리스트를 받도록 되어 있으므로, 
         # ProductInfo 리스트를 처리하는 별도 로직이나 어댑터 필요.
         # 여기서는 process_and_save를 수정하여 두 타입을 모두 지원하도록 함.
-        process_and_save(all_products, musinsa_seller, comparator, output_file, kst_now)
-        cleanup_old_files(output_dir, keep_count=5)
+        process_and_save(
+            all_products,
+            musinsa_seller,
+            comparator,
+            output_file,
+            kst_now,
+            fail_fast=fail_fast,
+            brand_name=brand_name,
+        )
+        cleanup_old_files(output_dir, keep_count=25)
 
 
-def process_and_save(items, musinsa_seller, comparator, output_file, kst_now):
+def process_and_save(
+    items,
+    musinsa_seller,
+    comparator,
+    output_file,
+    kst_now,
+    fail_fast=False,
+    brand_name=None,
+):
     """상품 리스트를 비교하고 CSV로 저장"""
     results = []
+    api_error_count = 0
+    total_items = len(items)
+    brand_label = brand_name or "UNKNOWN_BRAND"
     
     for i, item in enumerate(items):
         # item이 RankingItem인지 ProductInfo인지 확인
@@ -155,7 +191,10 @@ def process_and_save(items, musinsa_seller, comparator, output_file, kst_now):
             # ProductInfo인 경우 이미 상세 정보가 있으므로 get_product_info 호출 불필요할 수 있음
             # 하지만 model_no가 확실하다면 바로 비교
         
-        print(f"[{i+1}/{len(items)}] {product_name}")
+        print(
+            f"[{brand_label}] item {i+1}/{total_items} "
+            f"| model={model_no or '-'} | name={product_name}"
+        )
         
         try:
             # 모델 번호가 없으면 상세 조회 (RankingItem인 경우)
@@ -171,7 +210,7 @@ def process_and_save(items, musinsa_seller, comparator, output_file, kst_now):
                      pass
 
             # 비교 수행
-            comparison_result = comparator.compare_product(model_no)
+            comparison_result = comparator.compare_product(model_no, fail_on_api_error=fail_fast)
             if not comparison_result:
                 print("  -> Skip: Comparison failed")
                 continue
@@ -208,7 +247,10 @@ def process_and_save(items, musinsa_seller, comparator, output_file, kst_now):
             time.sleep(1.5)
             
         except Exception as e:
-            print(f"  -> Error: {e}")
+            api_error_count += 1
+            print(f"\n[API_ERROR] {product_name} ({model_no}) 처리 중 오류: {e}")
+            if fail_fast:
+                raise
             continue
 
     # CSV 저장
@@ -227,6 +269,9 @@ def process_and_save(items, musinsa_seller, comparator, output_file, kst_now):
         print(f"Saved {len(results)} rows to {output_file}")
     else:
         print("No results to save.")
+
+    if api_error_count > 0:
+        print(f"[API_ERROR] API 관련 오류 {api_error_count}건 감지됨")
 
 
 def main():

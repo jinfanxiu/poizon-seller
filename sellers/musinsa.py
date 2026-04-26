@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from enum import Enum
 from typing import Any
 
@@ -30,6 +31,7 @@ class MusinsaRankingItem(BaseModel):
 class MusinsaSeller(BaseSeller):
     def __init__(self) -> None:
         super().__init__("Musinsa")
+        self.last_api_error: str | None = None
         # 랭킹 섹션 데이터를 가져오는 API URL 템플릿
         self.ranking_section_url = "https://api.musinsa.com/api2/hm/web/v5/pans/ranking?storeCode=musinsa&sectionId={section_id}&contentsId=&categoryCode=000&subPan=product&gf=A&ageBand=AGE_BAND_ALL"
 
@@ -185,6 +187,7 @@ class MusinsaSeller(BaseSeller):
             data = response.json()
             return data.get("data", {}).get("list", [])
         except Exception as e:
+            self.last_api_error = f"musinsa search api failed: {e}"
             print(f"Error calling search API: {e}")
             return []
 
@@ -250,6 +253,7 @@ class MusinsaSeller(BaseSeller):
         }
         try:
             response = requests.get(url, headers=headers)
+            time.sleep(1)
             response.raise_for_status()
 
             # __NEXT_DATA__ 추출
@@ -304,6 +308,7 @@ class MusinsaSeller(BaseSeller):
                 "price": final_price,
             }
         except Exception as e:
+            self.last_api_error = f"musinsa base info failed({product_id}): {e}"
             print(f"Error fetching base info: {e}")
             return None
 
@@ -321,6 +326,7 @@ class MusinsaSeller(BaseSeller):
             response.raise_for_status()
             return response.json()
         except Exception as e:
+            self.last_api_error = f"musinsa options api failed({product_id}): {e}"
             print(f"Error fetching options: {e}")
             return None
 
@@ -341,6 +347,7 @@ class MusinsaSeller(BaseSeller):
             response.raise_for_status()
             return response.json()
         except Exception as e:
+            self.last_api_error = f"musinsa inventory api failed({product_id}): {e}"
             print(f"Error fetching inventory: {e}")
             return None
 
@@ -499,9 +506,11 @@ class MusinsaSeller(BaseSeller):
 
         try:
             response = requests.get(url, headers=headers)
+            time.sleep(1)
             response.raise_for_status()
             data = response.json()
         except Exception as e:
+            self.last_api_error = f"musinsa ranking api failed: {e}"
             print(f"Failed to fetch ranking: {e}")
             return []
 

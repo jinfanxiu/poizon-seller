@@ -164,6 +164,9 @@ def load_data(data_type, filename):
     return df
 
 st.title("👟 Poizon Seller Dashboard")
+st.caption(
+    "브랜드별 수집: `data/brand_search/` — 터미널 `uv run python run_brand_search.py 데상트 -p 1` → 아래 **Select Data Type**에서 `brand_search` 확인"
+)
 
 # --- 상단 컨트롤 패널 (UI 개선) ---
 st.markdown("### 🔄 Data Update")
@@ -227,17 +230,28 @@ st.divider()
 # --- 데이터 조회 ---
 data_types = get_data_types()
 if not data_types:
-    st.warning("아직 데이터가 수집되지 않았습니다.")
+    st.warning(
+        "아직 `data/` 아래에 수집된 폴더가 없습니다. "
+        "랭킹: `uv run python main.py` · 브랜드: `uv run python run_brand_search.py <브랜드> -p 1`"
+    )
     st.stop()
 
+# 브랜드 검색 결과(brand_search)가 있으면 기본으로 선택(8501에서 바로 보기)
 default_type_idx = 0
-if "ranking" in data_types:
+if "brand_search" in data_types:
+    default_type_idx = data_types.index("brand_search")
+elif "ranking" in data_types:
     default_type_idx = data_types.index("ranking")
 
-col_type, col_date = st.columns(2)
+col_type, col_date, col_ref = st.columns([1.2, 1.2, 0.4])
 
 with col_type:
     selected_type = st.selectbox("Select Data Type", data_types, index=default_type_idx)
+with col_ref:
+    st.write("")  # align
+    if st.button("캐시 갱신", help="같은 파일명이라도 방금 수집한 CSV를 읽을 때(기본 10분 캐시)"):
+        load_data.clear()
+        st.rerun()
 
 with col_date:
     available_files = get_available_files(selected_type)
@@ -255,7 +269,11 @@ if df is None:
 last_updated = df['Updated At'].iloc[0] if 'Updated At' in df.columns else selected_file.replace(".csv", "")
 st.caption(f"Data Loaded: {selected_type} / {selected_file} (Last Updated: {last_updated})")
 
-# 필터링 옵션
+if "Brand" not in df.columns:
+    st.error("CSV에 Brand 열이 없어 필터/표를 표시할 수 없습니다.")
+    st.dataframe(df, use_container_width=True)
+    st.stop()
+
 with st.expander("🔍 Filter Options", expanded=False):
     col_f1, col_f2 = st.columns(2)
     with col_f1:

@@ -40,7 +40,7 @@ class ProductComparator:
         
         return clean_color
 
-    def compare_product(self, keyword: str) -> ProductComparisonResult | None:
+    def compare_product(self, keyword: str, fail_on_api_error: bool = False) -> ProductComparisonResult | None:
         """
         키워드(모델 번호)로 무신사와 Poizon 상품을 검색하고 가격을 비교합니다.
         입력된 키워드가 복합 모델 번호(예: SQ313RPD91_BLK0)인 경우, 
@@ -60,8 +60,24 @@ class ProductComparator:
         print(f"[Comparator] Comparing for keyword: {search_keyword}")
 
         # 1. Fetch Data
+        if hasattr(self.musinsa, "last_api_error"):
+            self.musinsa.last_api_error = None
+        if hasattr(self.poizon, "last_api_error"):
+            self.poizon.last_api_error = None
         musinsa_infos = self.musinsa.search_product(search_keyword)
         poizon_info = self.poizon.get_product_info(search_keyword)
+
+        musinsa_api_error = getattr(self.musinsa, "last_api_error", None)
+        poizon_api_error = getattr(self.poizon, "last_api_error", None)
+        if musinsa_api_error or poizon_api_error:
+            print("[API_ERROR] Platform API failure detected during compare_product")
+            if musinsa_api_error:
+                print(f"  - Musinsa: {musinsa_api_error}")
+            if poizon_api_error:
+                print(f"  - Poizon: {poizon_api_error}")
+            if fail_on_api_error:
+                detail = "; ".join(v for v in [musinsa_api_error, poizon_api_error] if v)
+                raise RuntimeError(f"API blocked or failed: {detail}")
 
         if not musinsa_infos or not poizon_info:
             print("[Comparator] Failed to fetch product info from one or both platforms.")

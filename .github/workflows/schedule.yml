@@ -44,6 +44,7 @@ jobs:
         env:
           POIZON_DUTOKEN: ${{ secrets.POIZON_DUTOKEN }}
           POIZON_COOKIE: ${{ secrets.POIZON_COOKIE }}
+          POIZON_SHUMEIID: ${{ secrets.POIZON_SHUMEIID }}
           # 입력값 전달 (스케줄 실행 시에는 빈 값)
           EXECUTION_MODE: ${{ inputs.mode || 'ranking' }}
           TARGET_BRANDS: ${{ inputs.brands }}

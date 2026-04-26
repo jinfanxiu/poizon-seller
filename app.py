@@ -49,23 +49,27 @@ def check_password():
         st.session_state["password_correct"] = True
         return True
 
-    def password_entered():
-        if st.session_state["password"] == correct_password:
+    # 폼 제출로 검증 (on_change 콜백은 일부 Streamlit 버전에서 위젯 값이
+    # session_state에 아직 없어 KeyError가 날 수 있음 — Render 등)
+    if st.session_state.get("password_correct"):
+        return True
+
+    with st.form("password_form"):
+        pwd = st.text_input("Password", type="password", autocomplete="current-password")
+        submitted = st.form_submit_button("로그인")
+
+    if submitted:
+        if pwd == correct_password:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]
             st.query_params["auth"] = password_hash
+            st.rerun()
         else:
             st.session_state["password_correct"] = False
 
-    if "password_correct" not in st.session_state:
-        st.text_input("Password", type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.text_input("Password", type="password", on_change=password_entered, key="password")
+    if st.session_state.get("password_correct") is False:
         st.error("😕 Password incorrect")
-        return False
-    else:
-        return True
+
+    return False
 
 if not check_password():
     st.stop()
